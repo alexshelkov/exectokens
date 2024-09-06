@@ -1,7 +1,7 @@
 {
   "canisters": {
     "nft1_backend": {
-      "candid": "src/nft1_backend/nft1_backend.did",
+      "candid": "target/did/nft1_backend.did",
       "package": "nft1_backend",
       "type": "rust"
     }

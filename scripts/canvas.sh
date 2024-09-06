@@ -1,0 +1,2 @@
+# ./scripts/wasm-opt -Os ./src/program_basic_canvas/pkg/program_basic_canvas_bg.wasm -o ./src/program_basic_canvas/pkg/program_basic_canvas_bg.wasm
+./scripts/wasm2wat ./src/program_basic_canvas/pkg/program_basic_canvas_bg.wasm > ./scripts/programs/program_basic_canvas_bg.wat

@@ -1,0 +1,2 @@
+Aug 28 18:27:28.740 INFO Creating canister nft1_backend..., version: 0.20.1
+Aug 28 18:27:28.740 INFO nft1_backend canister was already created and has canister id: bkyz2-fmaaa-aaaaa-qaaaq-cai, version: 0.20.1

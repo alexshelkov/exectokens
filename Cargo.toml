@@ -1,5 +1,8 @@
 [workspace]
 members = [
-    "src/nft1_backend"
+  "src/nft1_backend",
+  "src/program_basic_main",
+  "src/program_basic_canvas",
+  "src/program_basic_command",
 ]
 resolver = "2"

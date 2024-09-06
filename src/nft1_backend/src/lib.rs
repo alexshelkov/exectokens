@@ -1,4 +1,15 @@
-#[ic_cdk::query]
-fn greet(name: String) -> String {
-    format!("Hello, {}!", name)
-}
+#![allow(clippy::collapsible_else_if)]
+#![allow(dead_code, unused_imports, unused_variables)]
+
+#[macro_use]
+extern crate ic_cdk_macros;
+#[macro_use]
+extern crate serde;
+
+mod attrs;
+mod canister;
+mod engine;
+mod headers;
+mod nft;
+mod program;
+mod state;
