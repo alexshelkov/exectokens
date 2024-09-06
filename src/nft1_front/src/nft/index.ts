@@ -103,7 +103,15 @@ export const Module = async (
   nft1Module: Nft1Module,
   moduleCode: Uint8Array | number[]
 ): Promise<SmartNftModule> => {
-  const wasm = await smartNftCreateInstance(imports);
+  
+  // TODO: possible way to work with required imports
+  const code = toResponse(moduleCode);
+  const r = await WebAssembly.compileStreaming(code)
+  const requiredImports = WebAssembly.Module.imports(r);
+  console.log(requiredImports);
+  
+  const wasm = smartNftCreateInstance(imports);
+  
   const { memory } = await wasm.init(toResponse(moduleCode));
 
   const exportNames = wasm.get_export_names();

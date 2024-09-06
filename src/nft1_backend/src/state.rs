@@ -283,7 +283,7 @@ pub fn nft_inc_id() -> u128 {
     })
 }
 
-pub fn module_id() -> u64 {
+pub fn module_inc_id() -> u64 {
     MODULES_LAST_ID.with(|last_id| {
         let id = *last_id.borrow().get();
         last_id.borrow_mut().set(id + 1).expect("can't set");
@@ -355,12 +355,14 @@ pub fn create_nft(id: NftId, nft_data: NftData) {
     });
 }
 
-pub fn update_modules(modules: Vec<(String, Vec<u8>)>) {
+pub fn update_modules(modules: Vec<(String, Vec<u8>)>) -> u64 {
+    let mut last_id = 0;
+
     for (name, wasm) in modules {
         with_wasmi(|engine, _, _| {
             MODULES.with(|modules| {
                 MODULES_DATA.with(|modules_data| {
-                    let id = module_id();
+                    let id = module_inc_id();
 
                     let wasm_module =
                         WasmiModule::new(engine, &mut &wasm[..]).expect("can't create module");
@@ -376,10 +378,14 @@ pub fn update_modules(modules: Vec<(String, Vec<u8>)>) {
                     modules_data
                         .borrow_mut()
                         .insert(id.try_into().unwrap(), wasm);
-                })
+
+                    last_id = id;
+                });
             });
         });
     }
+
+    last_id
 }
 
 pub fn get_limits(limits: ExecLimits) -> ExecLimits {

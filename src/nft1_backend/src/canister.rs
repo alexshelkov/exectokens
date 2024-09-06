@@ -135,10 +135,10 @@ fn init(args: InitArgs) {
 // ----------------------------------------------------------------------------------------
 
 #[update(name = "mint_exec")]
-fn mint_exec(args: MintExecArgs) {
+fn mint_exec(args: MintExecArgs) -> u64 {
     let program: ProgramRaw = serde_json::from_str(&args.program).expect("failed to parse code");
 
-    update_modules(program.get_modules());
+    update_modules(program.get_modules())
 }
 
 #[update(name = "mint")]

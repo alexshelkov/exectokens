@@ -98,23 +98,23 @@ pub fn smart_nft_view_canvas(elapsed_ms: u32) -> bool {
     }
 }
 
-#[wasm_bindgen]
-extern "C" {
-    fn smart_nft_main_run(command: Vec<u8>) -> Promise;
-}
+// #[wasm_bindgen]
+// extern "C" {
+//     fn smart_nft_main_run(command: Vec<u8>) -> Promise;
+// }
 
-#[wasm_bindgen]
-pub async fn smart_nft_view_command(command: Vec<u8>) -> Vec<u8> {
-    let promise = smart_nft_main_run(command);
+// #[wasm_bindgen]
+// pub async fn smart_nft_view_command(command: Vec<u8>) -> Vec<u8> {
+//     let promise = smart_nft_main_run(command);
 
-    let future = JsFuture::from(promise).await.unwrap();
+//     let future = JsFuture::from(promise).await.unwrap();
 
-    let y = Uint8Array::new(&future).to_vec();
+//     let y = Uint8Array::new(&future).to_vec();
 
-    y
-}
+//     y
+// }
 
-static VIEW: &str = "Command";
+static VIEW: &str = "Canvas";
 
 #[wasm_bindgen]
 pub fn smart_nft_view_name() -> String {
