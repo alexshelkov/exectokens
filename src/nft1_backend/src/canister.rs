@@ -164,7 +164,6 @@ fn mint(args: MintArgs) -> u128 {
     );
 
     id
-
 }
 
 #[update(name = "mint_stream")]

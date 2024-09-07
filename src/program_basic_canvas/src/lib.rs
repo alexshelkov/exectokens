@@ -1,6 +1,4 @@
-use js_sys::{Promise, Uint8Array};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
 
 const TICK: u16 = 500;
 const WIDTH: usize = 50;
@@ -97,22 +95,6 @@ pub fn smart_nft_view_canvas(elapsed_ms: u32) -> bool {
         return false;
     }
 }
-
-// #[wasm_bindgen]
-// extern "C" {
-//     fn smart_nft_main_run(command: Vec<u8>) -> Promise;
-// }
-
-// #[wasm_bindgen]
-// pub async fn smart_nft_view_command(command: Vec<u8>) -> Vec<u8> {
-//     let promise = smart_nft_main_run(command);
-
-//     let future = JsFuture::from(promise).await.unwrap();
-
-//     let y = Uint8Array::new(&future).to_vec();
-
-//     y
-// }
 
 static VIEW: &str = "Canvas";
 
