@@ -92,16 +92,13 @@ function smart_nft_view_name(): string;
 // ------------------------------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------------------------------
 
-function get_export_names(): string[];
-
 export type ModuleImports = {
-  smart_nft_main_run?: (program: Uint8Array) => Promise<Uint8Array>;
+  smart_nft_main_run_async?: (program: Uint8Array) => Promise<Uint8Array>;
 };
 
 export type ModuleInstance = {
   init: typeof __wbg_init;
   smart_nft_view_name: typeof smart_nft_view_name;
-  get_export_names: typeof get_export_names;
   smart_nft_view_command: typeof smart_nft_view_command;
   smart_nft_view_canvas_get_buffer: typeof smart_nft_view_canvas_get_buffer;
   smart_nft_view_canvas_get_width: typeof smart_nft_view_canvas_get_width;
@@ -111,4 +108,7 @@ export type ModuleInstance = {
   smart_nft_view_canvas: typeof smart_nft_view_canvas;
 };
 
-export default function create(imports: ModuleImports): ModuleInstance;
+export default function create(
+  createStaticImports: any,
+  createSimpleImports: any,
+): ModuleInstance;

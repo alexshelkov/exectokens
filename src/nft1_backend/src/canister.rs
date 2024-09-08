@@ -27,7 +27,7 @@ pub struct InitArgs {
     pub symbol: String,
     pub author: String,
     pub executions: Option<u64>,
-    pub refils: Option<u64>,
+    pub refills: Option<u64>,
     pub program: String,
 }
 
@@ -127,7 +127,7 @@ fn init(args: InitArgs) {
         symbol: args.symbol,
         author: args.author,
         executions: args.executions,
-        refils: args.refils,
+        refills: args.refills,
     });
 }
 
@@ -153,7 +153,7 @@ fn mint(args: MintArgs) -> u128 {
             id: id.into(),
             owner: args.owner,
             accuires: args.accuires,
-            refils: limits.refils,
+            refils: limits.refills,
             executions: limits.executions,
             attrs: args.attrs,
             contents_headers: args.contents_headers,
@@ -168,20 +168,6 @@ fn mint(args: MintArgs) -> u128 {
 
 #[update(name = "mint_stream")]
 fn mint_stream(args: MintStreamArgs) {}
-
-// ACQUIRE
-// ----------------------------------------------------------------------------------------
-
-#[update(name = "accuire")]
-fn acquire(args: AcquireArgs) -> Option<()> {
-    let nft_data = get_nft_data(args.id.into());
-
-    if nft_data.is_none() {
-        return None;
-    }
-
-    None
-}
 
 // MEMORY
 // ----------------------------------------------------------------------------------------
@@ -248,6 +234,26 @@ fn get_exec_public_stream(args: GetExecArgs) {}
 #[update(name = "exec")]
 fn exec(args: ExecArgs) -> Option<Vec<u8>> {
     exec_run(args.id.into(), args.command)
+}
+
+// ACQUIRE
+// ----------------------------------------------------------------------------------------
+
+#[update(name = "accuire")]
+fn acquire(args: AcquireArgs) -> Option<()> {
+    let nft_data = get_nft_data(args.id.into());
+
+    if nft_data.is_none() {
+        return None;
+    }
+
+    let nft_data = nft_data.unwrap();
+
+    if nft_data.accuires.is_none() {
+        return None;
+    }
+
+    None
 }
 
 // HELPERS

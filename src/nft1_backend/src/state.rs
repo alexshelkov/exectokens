@@ -1,7 +1,7 @@
 use crate::attrs::{Attr, AttrVal};
 use crate::engine::{define_global_attrs, define_global_contents, with_wasmi};
 use crate::headers::{check_headers, ContentHeader, HeaderBase};
-use crate::program::{DataModule, Export, Module, ModuleId};
+use crate::program::{DataModule, Export, Import, Module, ModuleId};
 use anyhow::{anyhow, Result};
 use candid::types::result;
 use candid::{CandidType, Decode, Encode, Principal};
@@ -31,7 +31,7 @@ pub struct CollectionState {
     pub author: String,
 
     pub executions: Option<u64>,
-    pub refils: Option<u64>,
+    pub refills: Option<u64>,
 }
 
 impl CollectionState {
@@ -43,17 +43,17 @@ impl CollectionState {
             author: String::from(""),
 
             executions: None,
-            refils: None,
+            refills: None,
         }
     }
 }
 
 impl Storable for CollectionState {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
 
@@ -141,6 +141,10 @@ impl NftData {
             modules: args.modules,
             modules_hidden: args.modules_hidden.unwrap_or(vec![]),
         }
+    }
+
+    pub fn get_all_modules(&self) -> Vec<ModuleId> {
+        [self.modules.clone(), self.modules_hidden.clone()].concat()
     }
 }
 
@@ -233,14 +237,14 @@ thread_local! {
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct ExecLimits {
-    pub refils: Option<u64>,
+    pub refills: Option<u64>,
     pub executions: Option<u64>,
 }
 
 impl ExecLimits {
     fn default() -> Self {
         Self {
-            refils: None,
+            refills: None,
             executions: None,
         }
     }
@@ -249,7 +253,7 @@ impl ExecLimits {
 impl From<(Option<u64>, Option<u64>)> for ExecLimits {
     fn from(item: (Option<u64>, Option<u64>)) -> Self {
         Self {
-            refils: item.0,
+            refills: item.0,
             executions: item.1,
         }
     }
@@ -267,7 +271,7 @@ pub fn get_limits_collection() -> ExecLimits {
     COLLECTION.with(|collection| {
         let attrs = collection.borrow().get().clone();
 
-        ExecLimits::from((attrs.refils, attrs.executions))
+        ExecLimits::from((attrs.refills, attrs.executions))
     })
 }
 
@@ -355,6 +359,12 @@ pub fn create_nft(id: NftId, nft_data: NftData) {
     });
 }
 
+// __wbg_queueMicrotask_48421b3cc9052b68: Func(FuncType { params: [I32], results: [I32] })
+// __wbg_queueMicrotask_12a30234db4045d3: Func(FuncType { params: [I32], results: [] })
+
+// __wbg_call_1084a111329e68ce: Func(FuncType { params: [I32, I32], results: [I32] })
+// __wbg_call_89af060b4e1523f2: Func(FuncType { params: [I32, I32, I32], results: [I32] })
+
 pub fn update_modules(modules: Vec<(String, Vec<u8>)>) -> u64 {
     let mut last_id = 0;
 
@@ -367,12 +377,22 @@ pub fn update_modules(modules: Vec<(String, Vec<u8>)>) -> u64 {
                     let wasm_module =
                         WasmiModule::new(engine, &mut &wasm[..]).expect("can't create module");
 
+                    let imports: Vec<_> = wasm_module
+                        .imports()
+                        .map(|e| {
+                            let name = e.name();
+                            let types = e.ty();
+
+                            Import::from((name, types))
+                        })
+                        .collect();
+
                     let exports: Vec<_> = wasm_module
                         .exports()
                         .map(|e| Export::from(e.name()))
                         .collect();
 
-                    let module = Module::new(id, name.clone(), exports);
+                    let module = Module::new(id, name.clone(), exports, imports);
 
                     modules.borrow_mut().insert(id, module);
                     modules_data
@@ -397,8 +417,8 @@ pub fn get_limits(limits: ExecLimits) -> ExecLimits {
 
     let module = module.unwrap();
 
-    let col_refils = limits
-        .refils
+    let col_refills = limits
+        .refills
         .map(|v| v.try_into().unwrap_or(0))
         .unwrap_or(-1);
     let col_executions = limits
@@ -413,14 +433,14 @@ pub fn get_limits(limits: ExecLimits) -> ExecLimits {
             .expect("failed to get limits_fn");
 
         let (refils, executions) = limits_fn
-            .call(&mut *store, (col_refils, col_executions))
+            .call(&mut *store, (col_refills, col_executions))
             .expect("failed to get limits");
 
-        let col_refils = col_refils.try_into().unwrap_or(0);
+        let col_refils = col_refills.try_into().unwrap_or(0);
         let col_executions = col_executions.try_into().unwrap_or(0);
 
         ExecLimits {
-            refils: Some(refils.try_into().unwrap_or(col_refils)),
+            refills: Some(refils.try_into().unwrap_or(col_refils)),
             executions: Some(executions.try_into().unwrap_or(col_executions)),
         }
     })
@@ -472,26 +492,7 @@ fn with_module_instance<R>(
     })
 }
 
-pub fn exec_run(id: NftId, command: Vec<u8>) -> Option<Vec<u8>> {
-    let nft_data = get_nft_data(id);
-
-    if nft_data.is_none() {
-        return None;
-    }
-
-    let nft_data = nft_data.unwrap();
-
-    let module = get_module_by_export_ids(
-        Export::Main,
-        [nft_data.modules.clone(), nft_data.modules_hidden.clone()].concat(),
-    );
-
-    if module.is_none() {
-        return None;
-    }
-
-    let module = module.unwrap();
-
+fn exec_bytes(module: Module, nft_data: NftData, fn_name: String, command: Vec<u8>) -> Vec<u8> {
     with_module_instance(module, Some(nft_data), |store, instance| {
         let len = command.len() as i32;
 
@@ -525,7 +526,6 @@ pub fn exec_run(id: NftId, command: Vec<u8>) -> Option<Vec<u8>> {
 
         wasm_memory[ptr..ptr + len as usize].copy_from_slice(&command);
 
-        let fn_name = Into::<String>::into(Export::Main);
         let exec_fn = instance
             .get_func(&mut *store, &fn_name)
             .expect("failed to find exec_fn")
@@ -560,8 +560,50 @@ pub fn exec_run(id: NftId, command: Vec<u8>) -> Option<Vec<u8>> {
         free.call(&mut *store, (r0, r1, 1))
             .expect("failed to free memory");
 
-        Some(result)
+        result
     })
+}
+
+pub fn exec_run(id: NftId, command: Vec<u8>) -> Option<Vec<u8>> {
+    let nft_data = get_nft_data(id);
+
+    if nft_data.is_none() {
+        return None;
+    }
+
+    let nft_data = nft_data.unwrap();
+
+    let module = get_module_by_export_ids(Export::Main, nft_data.get_all_modules());
+
+    if module.is_none() {
+        return None;
+    }
+
+    let module = module.unwrap();
+
+    let fn_name = Into::<String>::into(Export::Main);
+    Some(exec_bytes(module, nft_data, fn_name, command))
+}
+
+pub fn exec_accuire(id: NftId, command: Vec<u8>) -> Option<Vec<u8>> {
+    Some(vec![])
+    // let nft_data = get_nft_data(id);
+
+    // if nft_data.is_none() {
+    //     return None;
+    // }
+
+    // let nft_data = nft_data.unwrap();
+
+    // let module = get_module_by_export_ids(Export::Accuire, nft_data.get_all_modules());
+
+    // if module.is_none() {
+    //     return None;
+    // }
+
+    // let module = module.unwrap();
+
+    // let fn_name = Into::<String>::into(Export::Accuire);
 }
 
 pub fn get_module_by_export_ids(export: Export, ids: Vec<ModuleId>) -> Option<Module> {

@@ -167,7 +167,12 @@ export const NftDetailsCard = forwardRef<
     image: string;
     alt: string;
     viewName?: SmartNftViewName;
-    modules: { name: string; size: number; exports: string[] }[];
+    modules: {
+      name: string;
+      size: number;
+      imports: string[];
+      exports: string[];
+    }[];
     commandsHistory: {
       origin: 'user' | 'system';
       content: string;
@@ -248,21 +253,29 @@ export const NftDetailsCard = forwardRef<
             </CardHeader>
 
             <CardContent>
-              <Table>
-                <TableHeader>
+              <Table className="overflow-x-scroll" style={{tableLayout: 'fixed'}}>
+                <TableHeader className="w-full">
                   <TableRow>
-                    <TableHead className="w-[100px]">Module</TableHead>
-                    <TableHead>Exports</TableHead>
-                    <TableHead>Size</TableHead>
+                    <TableHead className="w-[150px]">Module</TableHead>
+                    <TableHead className="">Imports</TableHead>
+                    <TableHead className="">Exports</TableHead>
+                    <TableHead className="w-[100px]">Size</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {modules.map(({ name, exports, size }) => {
+                <TableBody className="w-full">
+                  {modules.map(({ name, imports, exports, size }) => {
                     return (
                       <TableRow key={name}>
-                        <TableCell className="font-semibold">{name}</TableCell>
-                        <TableCell>{exports.join(', ')}</TableCell>
-                        <TableCell>{size}</TableCell>
+                        <TableCell className="w-[150px] font-semibold break-words">
+                          {name}
+                        </TableCell>
+                        <TableCell className="break-words">
+                          {imports.join(', ')}
+                        </TableCell>
+                        <TableCell className="break-words">
+                          {exports.join(', ')}
+                        </TableCell>
+                        <TableCell className="w-[100px]">{size}</TableCell>
                       </TableRow>
                     );
                   })}

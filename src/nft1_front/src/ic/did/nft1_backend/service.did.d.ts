@@ -2,12 +2,13 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export interface AcquireArgs { 'id' : bigint }
 export interface Attr { 'val' : AttrVal, 'name' : string }
 export type AttrVal = { 'Num' : number } |
   { 'Bool' : boolean } |
   { 'Date' : string } |
   { 'Text' : string } |
-  { 'Time' : string } |
+  { 'Time' : SystemTime } |
   { 'DateTime' : string } |
   { 'Principal' : Principal };
 export interface CollectionState {
@@ -15,8 +16,8 @@ export interface CollectionState {
   'logo' : string,
   'name' : string,
   'author' : string,
+  'refills' : [] | [bigint],
   'symbol' : string,
-  'refils' : [] | [bigint],
 }
 export interface ContentHeader {
   'end' : number,
@@ -31,35 +32,46 @@ export interface ExecArgs { 'id' : bigint, 'command' : Uint8Array | number[] }
 export type Export = { 'Limits' : null } |
   { 'Main' : null } |
   { 'User' : string } |
-  { 'View' : ViewEngine };
+  { 'View' : ViewEngine } |
+  { 'Acquire' : {} };
 export interface GetArgs { 'id' : bigint }
+export type Import = {
+  'ImportFn' : {
+    'name' : string,
+    'params' : Array<string>,
+    'returns' : Array<string>,
+  }
+} |
+  { 'Import' : string };
 export interface InitArgs {
   'executions' : [] | [bigint],
   'logo' : string,
   'name' : string,
   'author' : string,
+  'refills' : [] | [bigint],
   'symbol' : string,
   'program' : string,
-  'refils' : [] | [bigint],
 }
 export interface ListArgs { 'owner' : Principal }
 export interface MintArgs {
-  'nft_modules_hidden' : [] | [BigUint64Array | bigint[]],
-  'nft_contents' : Uint8Array | number[],
-  'nft_attrs' : Array<Attr>,
-  'nft_owner' : Principal,
-  'nft_contents_headers' : Array<ContentHeader>,
-  'nft_modules' : BigUint64Array | bigint[],
-  'nft_accuires' : [] | [bigint],
+  'attrs' : Array<Attr>,
+  'contents' : Uint8Array | number[],
+  'owner' : Principal,
+  'modules_hidden' : [] | [BigUint64Array | bigint[]],
+  'contents_headers' : Array<ContentHeader>,
+  'modules' : BigUint64Array | bigint[],
+  'accuires' : [] | [bigint],
 }
 export interface MintExecArgs { 'program' : string }
 export interface Module {
   'id' : bigint,
   'exports' : Array<Export>,
   'name' : string,
+  'imports' : Array<Import>,
 }
 export interface Nft {
   'id' : bigint,
+  'memory' : Array<[number, Uint8Array | number[]]>,
   'attrs' : Array<Attr>,
   'contents' : Uint8Array | number[],
   'executions' : [] | [bigint],
@@ -69,11 +81,15 @@ export interface Nft {
   'accuires' : [] | [bigint],
   'refils' : [] | [bigint],
 }
+export interface SystemTime {
+  'nanos_since_epoch' : number,
+  'secs_since_epoch' : bigint,
+}
 export type ViewEngine = { 'Empty' : null } |
   { 'Command' : null } |
   { 'Canvas' : null };
 export interface _SERVICE {
-  'accuire' : ActorMethod<[{}], undefined>,
+  'accuire' : ActorMethod<[AcquireArgs], [] | [null]>,
   'collection_attrs' : ActorMethod<[], CollectionState>,
   'exec' : ActorMethod<[ExecArgs], [] | [Uint8Array | number[]]>,
   'get' : ActorMethod<[GetArgs], undefined>,
@@ -88,10 +104,9 @@ export interface _SERVICE {
   'list' : ActorMethod<[ListArgs], undefined>,
   'list_public' : ActorMethod<[ListArgs], Array<Nft>>,
   'mint' : ActorMethod<[MintArgs], bigint>,
-  'mint_exec' : ActorMethod<[MintExecArgs], undefined>,
+  'mint_exec' : ActorMethod<[MintExecArgs], bigint>,
   'mint_stream' : ActorMethod<[{}], undefined>,
   'ver' : ActorMethod<[], number>,
-  'wasm' : ActorMethod<[], Array<string>>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

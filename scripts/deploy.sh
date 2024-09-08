@@ -1,6 +1,8 @@
 dfx canister uninstall-code nft1_backend
 
-# dfx canister create nft1_backend
+set -e
+
+dfx canister create nft1_backend
 
 dfx build nft1_backend
 mkdir -p target/did/
@@ -9,16 +11,14 @@ dfx generate nft1_backend
 
 # ------------------------------------------------------------------------------------------------------------------
 
-program_main=$(node ./scripts/programs/load.js program_trivial)
+program_main=$(node ./scripts/programs/load.js program_basic_main_bg)
 
 dfx canister install \
     --mode=install \
     --identity icrc-admin \
-    --argument="(record{name=\"Name\";symbol=\"Symbol\";logo=\"Logo\";author=\"Author\";executions=opt 1;refils=opt 1;program=$program_main})" \
+    --argument="(record{name=\"Name\";symbol=\"Symbol\";logo=\"Logo\";author=\"Author\";executions=opt 1;refills=opt 1;program=$program_main})" \
     --yes \
     nft1_backend
-
-
 
 # ----------
 # MINT NFT 0
@@ -34,17 +34,18 @@ principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
 dfx canister call nft1_backend mint "(record {contents_headers=vec {$contents_headers}; contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {1}; modules_hidden=opt vec {} })"
 
-exit 0
-
 # ------
 # MINT 1
 # ------
+
+program_command=$(node ./scripts/programs/load.js program_basic_command_bg)
+
+dfx canister call nft1_backend mint_exec "(record {program=$program_command})"
 
 contents_headers='record {role=variant { Preview }; start=0; end=90; mime="text"}'
 contents='137; 80; 78; 71; 13; 10; 26; 10; 0; 0; 0; 13; 73; 72; 68; 82; 0; 0; 0; 8; 0; 0; 0; 8; 8; 2; 0; 0; 0; 75; 109; 41; 220; 0; 0; 0; 34; 73; 68; 65; 84; 8; 215; 99; 120; 173; 168; 135; 21; 49; 0; 241; 255; 15; 90; 104; 8; 33; 129; 83; 7; 97; 163; 136; 214; 129; 93; 2; 43; 2; 0; 181; 31; 90; 179; 225; 252; 176; 37; 0; 0; 0; 0; 73; 69; 78; 68; 174; 66; 96; 130'
 principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
-dfx canister call nft1_backend mint "(record {contents_headers=vec {$contents_headers}; contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {1}; modules_hidden=opt vec {0} })"
-
+dfx canister call nft1_backend mint "(record {contents_headers=vec {$contents_headers}; contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {2}; modules_hidden=opt vec {0} })"
 
 dfx deploy nft1_backend

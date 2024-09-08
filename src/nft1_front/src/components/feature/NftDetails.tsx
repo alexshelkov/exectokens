@@ -28,9 +28,17 @@ export default function NftDetails({
   const cardModules = modules.map((module) => {
     return {
       name: module.name,
+      imports: module.imports.map(imp => {
+        if ('ImportFn' in imp) {
+          return JSON.stringify(imp.ImportFn);
+        }
+
+        return imp.Import
+      }),
       exports: module.exports.map((exp) => {
         return JSON.stringify(exp);
       }),
+
       size: module.size
     };
   });

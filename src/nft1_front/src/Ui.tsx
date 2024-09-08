@@ -96,8 +96,8 @@ export const MenutItem = ({
 }) => {
   return (
     <Tooltip>
-      <TooltipTrigger>
-        {/* <Link href="#"> */}
+      <TooltipTrigger asChild>
+        <Link href="#">
           <Button
             variant="ghost"
             size="icon"
@@ -107,7 +107,7 @@ export const MenutItem = ({
             {icon}
             <span className="sr-only">{name}</span>
           </Button>
-        {/* </Link> */}
+        </Link>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={5}>
         {name}

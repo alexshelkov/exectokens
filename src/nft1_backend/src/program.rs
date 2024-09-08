@@ -6,6 +6,7 @@ use ic_stable_structures::{
 };
 use std::fmt;
 use std::{borrow::Cow, cell::RefCell};
+use wasmi::ExternType as WasmiExternType;
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub enum ViewEngine {
@@ -40,6 +41,7 @@ impl fmt::Display for ViewEngine {
 
 const EXPORT_MAIN: &str = "smart_nft_main";
 const EXPORT_VIEW: &str = "smart_nft_view";
+const EXPORT_ACQUIRE: &str = "smart_nft_acquire";
 const EXPORT_VIEW_CANVAS: &str = "smart_nft_view_canvas";
 const EXPORT_VIEW_COMMAND: &str = "smart_nft_view_command";
 const EXPORT_LIMITS: &str = "smart_nft_limits";
@@ -47,6 +49,7 @@ const EXPORT_LIMITS: &str = "smart_nft_limits";
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Export {
     Main,
+    Acquire(),
     View(ViewEngine),
     Limits,
     User(String),
@@ -69,6 +72,7 @@ impl Into<String> for Export {
     fn into(self) -> String {
         match self {
             Self::Main => EXPORT_MAIN.to_owned(),
+            Self::Acquire() => EXPORT_ACQUIRE.to_owned(),
             Self::View(view) => format!("View({})", view),
             Self::Limits => EXPORT_LIMITS.to_owned(),
             Self::User(name) => format!("User({})", name),
@@ -76,9 +80,36 @@ impl Into<String> for Export {
     }
 }
 
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct ModuleUses {
-    attrs: Option<String>,
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum Import {
+    Import(String),
+    ImportFn {
+        name: String,
+        params: Vec<String>,
+        returns: Vec<String>,
+    },
+}
+
+impl From<(&str, &WasmiExternType)> for Import {
+    fn from((name, types): (&str, &WasmiExternType)) -> Self {
+        match types {
+            WasmiExternType::Func(f) => {
+                let params = f.params().into_iter().map(|e| format!("{:?}", e)).collect();
+                let returns = f
+                    .results()
+                    .into_iter()
+                    .map(|e| format!("{:?}", e))
+                    .collect();
+
+                Self::ImportFn {
+                    name: name.into(),
+                    params,
+                    returns,
+                }
+            }
+            _ => return Self::Import(name.into()),
+        }
+    }
 }
 
 #[derive(
@@ -91,26 +122,26 @@ pub struct Module {
     pub id: ModuleId,
     pub name: String,
     pub exports: Vec<Export>,
-    pub uses: Option<ModuleUses>,
+    pub imports: Vec<Import>,
 }
 
 impl Module {
-    pub fn new(id: u64, name: String, exports: Vec<Export>) -> Self {
+    pub fn new(id: u64, name: String, exports: Vec<Export>, imports: Vec<Import>) -> Self {
         Self {
             id: ModuleId(id),
-            name: name,
-            exports: exports,
-            uses: None,
+            name,
+            exports,
+            imports,
         }
     }
 }
 
 impl Storable for Module {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
 
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
 
