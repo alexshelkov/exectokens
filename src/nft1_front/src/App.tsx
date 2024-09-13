@@ -11,7 +11,6 @@ import { nftsListRoute } from '@/routes/NftsListRoute';
 import { nftDetailsRoute } from '@/routes/NftDetailsRoute';
 import { createCanisterActors } from '@/nft/canister';
 import { InitSmartView } from '@/nft';
-// import { createRoute } from 'react-dom/client';
 
 const testKey = new Uint8Array([
   109, 123, 223, 178, 14, 78, 125, 84, 205, 53, 144, 130, 175, 72, 187, 120, 78,

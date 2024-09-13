@@ -12,11 +12,9 @@ export type AttrVal = { 'Num' : number } |
   { 'DateTime' : string } |
   { 'Principal' : Principal };
 export interface CollectionState {
-  'executions' : [] | [bigint],
-  'logo' : string,
+  'logo' : [] | [[ContentHeader, Uint8Array | number[]]],
   'name' : string,
   'author' : string,
-  'refills' : [] | [bigint],
   'symbol' : string,
 }
 export interface ContentHeader {
@@ -29,42 +27,41 @@ export type ContentRole = { 'Preview' : null } |
   { 'Logo' : null } |
   { 'User' : string };
 export interface ExecArgs { 'id' : bigint, 'command' : Uint8Array | number[] }
-export type Export = { 'Limits' : null } |
-  { 'Main' : null } |
+export type Export = { 'Main' : null } |
   { 'User' : string } |
   { 'View' : ViewEngine } |
   { 'Acquire' : {} };
-export interface GetArgs { 'id' : bigint }
+export interface GetArgs { 'id' : bigint, 'owner' : Principal }
 export type Import = {
-  'ImportFn' : {
-    'name' : string,
-    'params' : Array<string>,
-    'returns' : Array<string>,
-  }
-} |
+    'ImportFn' : {
+      'name' : string,
+      'params' : Array<string>,
+      'returns' : Array<string>,
+    }
+  } |
   { 'Import' : string };
 export interface InitArgs {
-  'executions' : [] | [bigint],
   'logo' : string,
   'name' : string,
   'author' : string,
-  'refills' : [] | [bigint],
   'symbol' : string,
   'program' : string,
 }
 export interface ListArgs { 'owner' : Principal }
 export interface MintArgs {
   'attrs' : Array<Attr>,
-  'contents' : Uint8Array | number[],
+  'contents' : Array<[string, string]>,
   'owner' : Principal,
-  'modules_hidden' : [] | [BigUint64Array | bigint[]],
-  'contents_headers' : Array<ContentHeader>,
-  'modules' : BigUint64Array | bigint[],
-  'accuires' : [] | [bigint],
+  'executions' : [] | [bigint],
+  'modules_hidden' : [] | [Uint32Array | number[]],
+  'acquired' : [] | [boolean],
+  'refills' : [] | [bigint],
+  'modules' : Uint32Array | number[],
 }
+export type MintError = { 'NftDataCreateError' : null };
 export interface MintExecArgs { 'program' : string }
 export interface Module {
-  'id' : bigint,
+  'id' : number,
   'exports' : Array<Export>,
   'name' : string,
   'imports' : Array<Import>,
@@ -75,12 +72,14 @@ export interface Nft {
   'attrs' : Array<Attr>,
   'contents' : Uint8Array | number[],
   'executions' : [] | [bigint],
+  'acquires' : [] | [bigint],
   'contents_headers' : Array<ContentHeader>,
   'contents_byte_size' : bigint,
-  'modules' : BigUint64Array | bigint[],
-  'accuires' : [] | [bigint],
-  'refils' : [] | [bigint],
+  'refills' : [] | [bigint],
+  'modules' : Uint32Array | number[],
 }
+export type Result = { 'Ok' : bigint } |
+  { 'Err' : MintError };
 export interface SystemTime {
   'nanos_since_epoch' : number,
   'secs_since_epoch' : bigint,
@@ -89,22 +88,20 @@ export type ViewEngine = { 'Empty' : null } |
   { 'Command' : null } |
   { 'Canvas' : null };
 export interface _SERVICE {
-  'accuire' : ActorMethod<[AcquireArgs], [] | [null]>,
+  'acquire' : ActorMethod<[AcquireArgs], [] | [null]>,
   'collection_attrs' : ActorMethod<[], CollectionState>,
   'exec' : ActorMethod<[ExecArgs], [] | [Uint8Array | number[]]>,
-  'get' : ActorMethod<[GetArgs], undefined>,
-  'get_exec' : ActorMethod<[GetArgs], undefined>,
+  'get_exec' : ActorMethod<[AcquireArgs], undefined>,
   'get_exec_public' : ActorMethod<
-    [GetArgs],
+    [AcquireArgs],
     [] | [Array<[Module, Uint8Array | number[]]>]
   >,
-  'get_exec_public_stream' : ActorMethod<[GetArgs], undefined>,
   'get_public' : ActorMethod<[GetArgs], [] | [Nft]>,
   'last_id' : ActorMethod<[], bigint>,
   'list' : ActorMethod<[ListArgs], undefined>,
   'list_public' : ActorMethod<[ListArgs], Array<Nft>>,
-  'mint' : ActorMethod<[MintArgs], bigint>,
-  'mint_exec' : ActorMethod<[MintExecArgs], bigint>,
+  'mint' : ActorMethod<[MintArgs], Result>,
+  'mint_exec' : ActorMethod<[MintExecArgs], number>,
   'mint_stream' : ActorMethod<[{}], undefined>,
   'ver' : ActorMethod<[], number>,
 }

@@ -1,4 +1,5 @@
-import { Identity, SmartNft, SmartPreview } from '@/nft';
+import { Nft1ContentHeader } from '@/ic/did';
+import { SmartNft } from '@/nft';
 
 export interface Nft {
   nft: SmartNft;
@@ -9,7 +10,7 @@ export interface CollectionAttrs {
   id: string;
   name: string;
   symbol: string;
-  logo: string;
+  logo: [] | [[Nft1ContentHeader, Uint8Array]];
   author: string;
 }
 

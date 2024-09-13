@@ -1,7 +1,5 @@
 import { createRoute } from '@tanstack/react-router';
 
-import { SmartView } from '@/nft';
-
 import NftsList from '@/components/feature/NftsList';
 import { Collection } from '@/routes/types';
 import { rootRoute } from '@/routes/RootRoute';

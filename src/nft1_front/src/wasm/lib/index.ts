@@ -17,6 +17,7 @@ interface SystemFuncs {
   passStringToWasm0: any;
   getDataViewMemory0: any;
   WASM_VECTOR_LEN: any;
+  passArray8ToWasm0, any;
   handleError: any;
 }
 
@@ -31,7 +32,7 @@ const createStaticImports = (
     debugString,
     getStringFromWasm0,
     getArrayU8FromWasm0,
-    getDataViewMemory0
+    getDataViewMemory0,
   }: SystemFuncs,
   imports: { wbg: Record<string, any> }
 ) => {
@@ -60,7 +61,7 @@ const createStaticImports = (
     return ret;
   };
   imports.wbg.__wbindgen_uint8_array_new = function (arg0: any, arg1: any) {
-    var v0 = getArrayU8FromWasm0(arg0, arg1).slice();
+    const v0 = getArrayU8FromWasm0(arg0, arg1).slice();
     wasmGet().__wbindgen_free(arg0, arg1 * 1, 1);
     const ret = v0;
     return addHeapObject(ret);
@@ -111,11 +112,14 @@ const createSimpleImports = (
   return (
     wasmGet: any,
     {
+      WASM_VECTOR_LEN,
       getArrayU8FromWasm0,
       addHeapObject,
       handleError,
       getObject,
-      getStringFromWasm0
+      getStringFromWasm0,
+      getDataViewMemory0,
+      passArray8ToWasm0
     }: SystemFuncs,
     imports: { wbg: Record<string, any> }
   ) => {
@@ -150,8 +154,8 @@ const createSimpleImports = (
       // @ts-ignore
       typeof FinalizationRegistry === 'undefined'
         ? { register: () => {}, unregister: () => {} }
-        // @ts-ignore
-        : new FinalizationRegistry((state) => {
+        : // @ts-ignore
+          new FinalizationRegistry((state) => {
             wasmGet()[wbindgen_export].get(state.dtor)(state.a, state.b);
           });
 

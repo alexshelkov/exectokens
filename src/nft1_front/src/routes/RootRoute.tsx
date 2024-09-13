@@ -4,7 +4,7 @@ import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import { Dashboard } from '@/Ui';
 import { SmartView } from '@/nft';
 
-function ErrorComponent({ error }: { error: Error }) {
+const ErrorComponent = ({ error }: { error: Error }) => {
   const router = useRouter();
 
   return (

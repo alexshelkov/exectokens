@@ -6,10 +6,10 @@ extern crate ic_cdk_macros;
 #[macro_use]
 extern crate serde;
 
+mod contents;
 mod attrs;
 mod canister;
 mod engine;
-mod headers;
 mod nft;
 mod program;
 mod state;

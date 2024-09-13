@@ -157,6 +157,7 @@ export const Module = async (
 
 const SmartView = (
   { nft1Actor }: { nft1Actor: Nft1Actor },
+  owner: Principal,
   nftsData: SmartNft[] | undefined
 ) => {
   const canisterId = Actor.canisterIdOf(nft1Actor).toText();
@@ -182,7 +183,7 @@ const SmartView = (
         return nftData;
       }
 
-      const [data] = await nft1Actor.get_public({ id });
+      const [data] = await nft1Actor.get_public({ id, owner });
 
       if (!data) {
         throw new Error(`NFT not found: ${id}`);
@@ -287,7 +288,7 @@ const SmartPreview = (
     return nftsData;
   };
 
-  const view = SmartView({ nft1Actor }, nftsData);
+  const view = SmartView({ nft1Actor }, owner, nftsData);
 
   return {
     collection,

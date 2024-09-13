@@ -53,33 +53,44 @@ function __wbg_init(
  * @returns {number}
  */
 function smart_nft_view_canvas_get_buffer(): number;
+
 /**
  * @returns {number}
  */
 function smart_nft_view_canvas_get_width(): number;
+
 /**
  * @returns {number}
  */
 function smart_nft_view_canvas_get_height(): number;
+
 /**
  * @returns {number}
  */
 function smart_nft_view_canvas_get_scale(): number;
+
 /**
  * @returns {number}
  */
 function smart_nft_view_canvas_get_tick(): number;
+
 /**
  * @param {number} elapsed_ms
  * @returns {boolean}
  */
 function smart_nft_view_canvas(elapsed_ms: number): boolean;
 
+// /**
+//  * @param {Uint8Array} command
+//  * @returns {Promise<Uint8Array>}
+//  */
+// function smart_nft_view_command(command: Uint8Array): Promise<Uint8Array>;
+
 /**
- * @param {Uint8Array} command
- * @returns {Promise<Uint8Array>}
- */
-function smart_nft_view_command(command: Uint8Array): Promise<Uint8Array>;
+* @param {Uint8Array} command
+* @returns {Uint8Array}
+*/
+export function smart_nft_view_command(command: Uint8Array): Uint8Array;
 
 /**
  * @returns {string}

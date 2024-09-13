@@ -1,14 +1,10 @@
 use crate::{
     attrs::Attr,
-    headers::ContentHeader,
+    contents::{Contents, ContentsCreate},
     nft::Nft,
     program::{DataModule, Export, Module, ModuleId},
     state::{
-        create_nft, exec_run, get_data_modules, get_limits, get_limits_collection,
-        get_module_by_export, get_module_code, get_nft_data, get_nft_memory, list_nfts, nft_get_id,
-        nft_inc_id, update_collection, update_modules, with_collection, CollectionState,
-        ExecLimits, NftData, NftDataCreate, COLLECTION, MODULES, MODULES_DATA, NFTS_DATA,
-        NFT_LAST_ID,
+        create_nft, exec_run, get_data_modules, get_module_by_export, get_module_code, list_nfts, nft_data_get, nft_get_id, nft_inc_id, nft_memory_get, update_collection, update_modules, with_collection, CollectionState, ExecLimits, NftData, NftDataCreate, NftMemory, NftOwnedId, COLLECTION, MODULES, MODULES_DATA, NFTS_DATA, NFT_LAST_ID
     },
 };
 use candid::{CandidType, Encode, Principal};
@@ -26,8 +22,6 @@ pub struct InitArgs {
     pub logo: String,
     pub symbol: String,
     pub author: String,
-    pub executions: Option<u64>,
-    pub refills: Option<u64>,
     pub program: String,
 }
 
@@ -39,12 +33,18 @@ pub struct MintExecArgs {
 #[derive(CandidType, Deserialize)]
 pub struct MintArgs {
     pub owner: Principal,
-    pub accuires: Option<u64>,
+    pub executions: Option<u64>,
+    pub refills: Option<u64>,
+    pub acquired: Option<bool>,
     pub attrs: Vec<Attr>,
-    pub contents: Vec<u8>,
-    pub contents_headers: Vec<ContentHeader>,
+    pub contents: Vec<ContentsCreate>,
     pub modules: Vec<ModuleId>,
     pub modules_hidden: Option<Vec<ModuleId>>,
+}
+
+#[derive(CandidType, Deserialize)]
+pub enum MintError {
+    NftDataCreateError,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -58,6 +58,7 @@ pub struct MintStreamArgs {}
 #[derive(CandidType, Deserialize)]
 pub struct GetArgs {
     pub id: u128,
+    pub owner: Principal,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -123,11 +124,9 @@ fn init(args: InitArgs) {
 
     update_collection(CollectionState {
         name: args.name,
-        logo: args.logo,
+        logo: Contents::create_logo(args.logo),
         symbol: args.symbol,
         author: args.author,
-        executions: args.executions,
-        refills: args.refills,
     });
 }
 
@@ -135,35 +134,28 @@ fn init(args: InitArgs) {
 // ----------------------------------------------------------------------------------------
 
 #[update(name = "mint_exec")]
-fn mint_exec(args: MintExecArgs) -> u64 {
+fn mint_exec(args: MintExecArgs) -> u32 {
     let program: ProgramRaw = serde_json::from_str(&args.program).expect("failed to parse code");
 
     update_modules(program.get_modules())
 }
 
 #[update(name = "mint")]
-fn mint(args: MintArgs) -> u128 {
-    let id: u128 = nft_inc_id();
+fn mint(args: MintArgs) -> Result<u128, MintError> {
+    let nft_data_create = NftDataCreate {
+        owner: args.owner,
+        refills: args.refills,
+        executions: args.executions,
+        acquired: args.acquired.unwrap_or(true),
+        attrs: args.attrs,
+        contents: args.contents,
+        modules: args.modules,
+        modules_hidden: args.modules_hidden,
+    };
 
-    let limits = get_limits(get_limits_collection());
-
-    create_nft(
-        id.into(),
-        NftData::new(NftDataCreate {
-            id: id.into(),
-            owner: args.owner,
-            accuires: args.accuires,
-            refils: limits.refills,
-            executions: limits.executions,
-            attrs: args.attrs,
-            contents_headers: args.contents_headers,
-            contents: args.contents,
-            modules: args.modules,
-            modules_hidden: args.modules_hidden,
-        }),
-    );
-
-    id
+    create_nft(nft_data_create)
+        .map(|id| Ok(id.into()))
+        .unwrap_or(Err(MintError::NftDataCreateError))
 }
 
 #[update(name = "mint_stream")]
@@ -185,10 +177,13 @@ fn collection_attrs() -> CollectionState {
     with_collection(|collection| collection.clone())
 }
 
-#[update(name = "get_public")]
+#[query(name = "get_public")]
 fn get_public(args: GetArgs) -> Option<Nft> {
-    let nft_data = get_nft_data(args.id.into());
-    let nft_mem = get_nft_memory(args.id.into());
+    let id = args.id.into();
+    let id_owned = NftOwnedId(id, args.owner);
+
+    let nft_data = nft_data_get(id);
+    let nft_mem = nft_memory_get(id_owned);
 
     if nft_data.is_none() || nft_mem.is_none() {
         return None;
@@ -197,10 +192,7 @@ fn get_public(args: GetArgs) -> Option<Nft> {
     Some((nft_data.unwrap(), nft_mem.unwrap()).into())
 }
 
-#[update(name = "get")]
-fn get(args: GetArgs) {}
-
-#[update(name = "list_public")]
+#[query(name = "list_public")]
 fn list_public(args: ListArgs) -> Vec<Nft> {
     list_nfts(args.owner)
         .into_iter()
@@ -216,7 +208,7 @@ fn list(args: ListArgs) {}
 
 #[update(name = "get_exec_public")]
 fn get_exec_public(args: GetExecArgs) -> Option<Vec<DataModule>> {
-    let nft_data = get_nft_data(args.id.into());
+    let nft_data = nft_data_get(args.id.into());
 
     nft_data.map(|nft_data| {
         let data_modules = get_data_modules(nft_data.modules);
@@ -228,30 +220,29 @@ fn get_exec_public(args: GetExecArgs) -> Option<Vec<DataModule>> {
 #[update(name = "get_exec")]
 fn get_exec(args: GetExecArgs) {}
 
-#[update(name = "get_exec_public_stream")]
-fn get_exec_public_stream(args: GetExecArgs) {}
-
 #[update(name = "exec")]
 fn exec(args: ExecArgs) -> Option<Vec<u8>> {
-    exec_run(args.id.into(), args.command)
+    let owner = ic_cdk::caller();
+
+    ic_cdk::println!("{:?} {:?}", Principal::anonymous().to_text(), owner.to_text());
+
+    let id_owned = NftOwnedId(args.id.into(), owner);
+
+    exec_run(id_owned, args.command)
 }
 
 // ACQUIRE
 // ----------------------------------------------------------------------------------------
 
-#[update(name = "accuire")]
+#[update(name = "acquire")]
 fn acquire(args: AcquireArgs) -> Option<()> {
-    let nft_data = get_nft_data(args.id.into());
+    let nft_data = nft_data_get(args.id.into());
 
     if nft_data.is_none() {
         return None;
     }
 
     let nft_data = nft_data.unwrap();
-
-    if nft_data.accuires.is_none() {
-        return None;
-    }
 
     None
 }

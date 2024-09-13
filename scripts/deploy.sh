@@ -12,11 +12,12 @@ dfx generate nft1_backend
 # ------------------------------------------------------------------------------------------------------------------
 
 program_main=$(node ./scripts/programs/load.js program_basic_main_bg)
+collection_logo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAANlBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC3dmhyAAAAEnRSTlMAqq2PKkQlBZcjjIg3J0aTgQ2orqxeAAAAd0lEQVQY01WPWw6EMAwDnUdLUpYC97/sGooQnVaRJj92cOGmImqOwWJ7gmTYcrsWPBS9NkZ/Nwb4DtQKjBkOS7jIhjHToMBat/WZVAF+ny98EwKdnGrJtOMEzqMwqcGD+y6Ezti5WG9z9a7jGIu8m0ajf85vDvIHaPMCsqJHXgQAAAAASUVORK5CYII='
 
 dfx canister install \
     --mode=install \
     --identity icrc-admin \
-    --argument="(record{name=\"Name\";symbol=\"Symbol\";logo=\"Logo\";author=\"Author\";executions=opt 1;refills=opt 1;program=$program_main})" \
+    --argument="(record{name=\"Name\";symbol=\"Symbol\";logo=\"$collection_logo\";author=\"Author\";executions=opt 1;refills=opt 1;program=$program_main})" \
     --yes \
     nft1_backend
 
@@ -24,28 +25,30 @@ dfx canister install \
 # MINT NFT 0
 # ----------
 
+echo "Minting NFT 1"
+
 program_canvas=$(node ./scripts/programs/load.js program_basic_canvas_bg)
 
 dfx canister call nft1_backend mint_exec "(record {program=$program_canvas})"
 
-contents_headers='record {role=variant { Preview }; start=0; end=90; mime="text"}'
-contents='137; 80; 78; 71; 13; 10; 26; 10; 0; 0; 0; 13; 73; 72; 68; 82; 0; 0; 0; 8; 0; 0; 0; 8; 8; 2; 0; 0; 0; 75; 109; 41; 220; 0; 0; 0; 34; 73; 68; 65; 84; 8; 215; 99; 120; 173; 168; 135; 21; 49; 0; 241; 255; 15; 90; 104; 8; 33; 129; 83; 7; 97; 163; 136; 214; 129; 93; 2; 43; 2; 0; 181; 31; 90; 179; 225; 252; 176; 37; 0; 0; 0; 0; 73; 69; 78; 68; 174; 66; 96; 130'
+contents='record {"Preview"; "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEW1pdXtHCQ9Y5g7AAAAGklEQVQI12NAA4z//zdgEA/YCRBkacMksAAA87Qr4XDjZmAAAAAASUVORK5CYII="}'
 principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
-dfx canister call nft1_backend mint "(record {contents_headers=vec {$contents_headers}; contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {1}; modules_hidden=opt vec {} })"
+dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {1}; modules_hidden=opt vec {} })"
 
 # ------
 # MINT 1
 # ------
 
+echo "Minting NFT 2"
+
 program_command=$(node ./scripts/programs/load.js program_basic_command_bg)
 
 dfx canister call nft1_backend mint_exec "(record {program=$program_command})"
 
-contents_headers='record {role=variant { Preview }; start=0; end=90; mime="text"}'
-contents='137; 80; 78; 71; 13; 10; 26; 10; 0; 0; 0; 13; 73; 72; 68; 82; 0; 0; 0; 8; 0; 0; 0; 8; 8; 2; 0; 0; 0; 75; 109; 41; 220; 0; 0; 0; 34; 73; 68; 65; 84; 8; 215; 99; 120; 173; 168; 135; 21; 49; 0; 241; 255; 15; 90; 104; 8; 33; 129; 83; 7; 97; 163; 136; 214; 129; 93; 2; 43; 2; 0; 181; 31; 90; 179; 225; 252; 176; 37; 0; 0; 0; 0; 73; 69; 78; 68; 174; 66; 96; 130'
+contents='record {"Preview"; "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEX15JwisUxzhw6qAAAAG0lEQVQI12NAA4z//zdgEA/YCRGY2sjRgQUAAHTZMD31tNU9AAAAAElFTkSuQmCC"}'
 principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
-dfx canister call nft1_backend mint "(record {contents_headers=vec {$contents_headers}; contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {2}; modules_hidden=opt vec {0} })"
+dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {2}; modules_hidden=opt vec {0} })"
 
 dfx deploy nft1_backend

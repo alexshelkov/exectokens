@@ -1,6 +1,6 @@
 use crate::{
     attrs::Attr,
-    headers::ContentHeader,
+    contents::ContentHeader,
     program::{Module, ModuleId},
     state::{NftData, NftMemory},
 };
@@ -11,8 +11,8 @@ use candid::{CandidType, Encode, Principal};
 pub struct Nft {
     pub id: u128,
     pub executions: Option<u128>,
-    pub refils: Option<u128>,
-    pub accuires: Option<u64>,
+    pub refills: Option<u128>,
+    pub acquires: Option<u64>,
     pub attrs: Vec<Attr>,
     pub contents_byte_size: u64,
     pub contents_headers: Vec<ContentHeader>,
@@ -28,8 +28,8 @@ impl From<(NftData, NftMemory)> for Nft {
         Self {
             id: nft_data.id.into(),
             executions: None,
-            refils: None,
-            accuires: None,
+            refills: None,
+            acquires: None,
             attrs: nft_data.attrs,
             contents_byte_size: contents_len,
             contents_headers: nft_data.contents_headers,
