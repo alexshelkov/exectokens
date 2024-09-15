@@ -4,7 +4,7 @@ import { Principal } from '@dfinity/principal';
 import { getPreviewBlob } from '@/nft/utils';
 import { SmartStore } from '@/nft/store';
 import { CanisterActorsFactory, Identity, getCanister } from '@/nft/canister';
-import { Nft1Actor, Nft1Module } from '@/ic/lib';
+import { Nft1, Nft1Actor, Nft1Module } from '@/ic/lib';
 import {
   createSmartNftInstance,
   SmartNftModuleImports,
@@ -49,6 +49,10 @@ export interface SmartNftViews {
 export interface SmartNftModule extends Nft1Module, SmartNftViews {
   size: number;
 }
+
+export const nftIdToStr = (nftId: Nft1['id']) => {
+  return `${nftId}`;
+};
 
 const toResponse = (bytes: Uint8Array | number[]) => {
   return new Response(bytes as Uint8Array, {
@@ -156,12 +160,11 @@ export const Module = async (
 };
 
 const SmartView = (
+  store: SmartStore,
   { nft1Actor }: { nft1Actor: Nft1Actor },
   owner: Principal,
   nftsData: SmartNft[] | undefined
 ) => {
-  const canisterId = Actor.canisterIdOf(nft1Actor).toText();
-
   return (id: bigint) => {
     const imports: SmartNftModuleImports = {
       async smart_nft_main_run_async(command) {
@@ -189,9 +192,7 @@ const SmartView = (
         throw new Error(`NFT not found: ${id}`);
       }
 
-      const store = await SmartStore.store(canisterId);
-
-      const preview = await store.getOr('preview', 0, () =>
+      const preview = await store.getOr(nftIdToStr(data.id), 'preview', () =>
         getPreviewBlob(data)
       );
 
@@ -245,17 +246,18 @@ const SmartView = (
 };
 
 const SmartPreview = (
+  store: SmartStore,
   { nft1Actor }: { nft1Actor: Nft1Actor },
-  owner: Principal
+  owner: Principal,
+  collectionId: string
 ) => {
-  const canisterId = Actor.canisterIdOf(nft1Actor).toText();
   let nftsData: SmartNft[] | undefined;
 
   const collection = async () => {
     const datas = await nft1Actor.collection_attrs();
 
     return {
-      id: canisterId,
+      id: collectionId,
       symbol: datas.symbol,
       name: datas.name,
       logo: datas.logo,
@@ -272,10 +274,10 @@ const SmartPreview = (
 
     nftsData = await Promise.all(
       datas.map(async (data) => {
-        const store = await SmartStore.store(canisterId);
-
-        const preview = await store.getOr('preview', 0, () =>
-          getPreviewBlob(data)
+        const preview = await store.getOr(
+          nftIdToStr(data.id),
+          'preview',
+          () => getPreviewBlob(data)
         );
 
         return {
@@ -288,7 +290,7 @@ const SmartPreview = (
     return nftsData;
   };
 
-  const view = SmartView({ nft1Actor }, owner, nftsData);
+  const view = SmartView(store, { nft1Actor }, owner, nftsData);
 
   return {
     collection,
@@ -309,7 +311,10 @@ export const InitSmartView = (
       collectionCanisterId
     );
 
-    return SmartPreview({ nft1Actor }, owner);
+    const canisterId = Actor.canisterIdOf(nft1Actor).toText();
+    const store = await SmartStore.store(canisterId);
+
+    return SmartPreview(store, { nft1Actor }, owner, canisterId);
   };
 };
 

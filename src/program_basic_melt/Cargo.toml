@@ -1,0 +1,16 @@
+[package]
+name = "program_basic_melt"
+version = "0.1.0"
+authors = ["Alex Shelkovskiy <alexshelkov@gmail.com>"]
+edition = "2021"
+
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+js-sys = "0.3.70"
+panic-halt = "0.2.0"
+panic-never = "0.1.0"
+wasm-bindgen = "0.2.84"
+wasm-bindgen-futures = "0.4.43"

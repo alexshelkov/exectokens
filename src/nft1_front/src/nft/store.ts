@@ -11,30 +11,28 @@ const createSmartStore = () => {
     return storage;
   };
 
-  const get = async (itemType: 'preview' | 'module', itemId: number) => {
-    const response = await storage?.match(`/${itemType}/${itemId}`);
+  const get = async (nftId: string, itemType: 'preview' | 'module') => {
+    const response = await storage?.match(`/${nftId}/${itemType}`);
 
     return response?.blob();
   };
 
-  const has = async (itemType: 'preview' | 'module', itemId: number) => {
-    return !!(await storage?.match(`/${itemType}/${itemId}`));
+  const has = async (nftId: string, itemType: 'preview' | 'module') => {
+    return !!(await storage?.match(`/${nftId}/${itemType}`));
   };
 
   const add = async (
+    nftId: string,
     itemType: 'preview' | 'module',
-    itemId: number,
     contents: Blob
   ) => {
     const request = new Response(contents);
 
-    await storage?.put(`/${itemType}/${itemId}`, request);
-
-    return itemId;
+    await storage?.put(`/${nftId}/${itemType}`, request);
   };
 
-  const getOr = async (itemType: 'preview' | 'module', itemId: number, creator: () => Blob) => {
-    let item = await get(itemType, itemId);
+  const getOr = async (nftId: string, itemType: 'preview' | 'module', creator: () => Blob) => {
+    let item = await get(nftId, itemType);
 
     if (item) {
       return item;
@@ -42,7 +40,7 @@ const createSmartStore = () => {
 
     item = creator();
 
-    await add(itemType, itemId, item);
+    await add(nftId, itemType, item);
 
     return item;
   };
@@ -64,3 +62,5 @@ const createSmartStore = () => {
 };
 
 export const SmartStore = createSmartStore();
+
+export type SmartStore = Awaited<ReturnType<typeof SmartStore['store']>>;

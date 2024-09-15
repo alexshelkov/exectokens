@@ -1,3 +1,7 @@
+/* eslint-disable prefer-rest-params */
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { default as create } from '@/wasm/interfaces/smart_nft';
 import type { ModuleImports as SmartNftModuleImports } from '@/wasm/interfaces/smart_nft';
 import { Nft1Module } from '@/ic/did';
@@ -17,7 +21,7 @@ interface SystemFuncs {
   passStringToWasm0: any;
   getDataViewMemory0: any;
   WASM_VECTOR_LEN: any;
-  passArray8ToWasm0, any;
+  passArray8ToWasm0: any;
   handleError: any;
 }
 
@@ -112,14 +116,11 @@ const createSimpleImports = (
   return (
     wasmGet: any,
     {
-      WASM_VECTOR_LEN,
       getArrayU8FromWasm0,
       addHeapObject,
       handleError,
       getObject,
       getStringFromWasm0,
-      getDataViewMemory0,
-      passArray8ToWasm0
     }: SystemFuncs,
     imports: { wbg: Record<string, any> }
   ) => {
@@ -185,7 +186,7 @@ const createSimpleImports = (
       {
         check: /^__wbg_smartnftmainrunasync_/,
         fn(arg0: any, arg1: any) {
-          let v0 = getArrayU8FromWasm0(arg0, arg1).slice();
+          const v0 = getArrayU8FromWasm0(arg0, arg1).slice();
           wasmGet().__wbindgen_free(arg0, arg1 * 1, 1);
           const ret = providedImports.smart_nft_main_run_async!(v0);
           return addHeapObject(ret);
@@ -330,9 +331,10 @@ const createSimpleImports = (
       {
         check: /__wbg_new_/,
         fn(arg0: any, arg1: any) {
+          let state0: any;
           try {
-            var state0: any = { a: arg0, b: arg1 };
-            var cb0 = (arg0: any, arg1: any) => {
+            state0 = { a: arg0, b: arg1 };
+            const cb0 = (arg0: any, arg1: any) => {
               const a = state0.a;
               state0.a = 0;
               try {
@@ -359,8 +361,8 @@ const createSimpleImports = (
       }
     ];
 
-    for (let pattern of patterns) {
-      for (let imp of requiredImports) {
+    for (const pattern of patterns) {
+      for (const imp of requiredImports) {
         if (!('ImportFn' in imp)) {
           continue;
         }

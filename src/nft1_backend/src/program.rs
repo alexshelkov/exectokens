@@ -1,4 +1,7 @@
-use crate::{attrs::Attr, engine::{StoreState, WasmiLinker, WasmiStore}};
+use crate::{
+    attrs::Attr,
+    engine::{StoreState, WasmiLinker, WasmiStore},
+};
 use candid::{CandidType, Decode, Encode, Principal};
 use ic_stable_structures::{
     storable::{Blob, Bound},
@@ -7,10 +10,9 @@ use ic_stable_structures::{
 use std::fmt;
 use std::{borrow::Cow, cell::RefCell};
 use wasmi::{
-    AsContext, AsContextMut, Caller as WasmiCaller, ExternType as WasmiExternType,
-    Func as WasmiFunc, Global as WasmiGlobal, Instance as WasmiInstance,
-    Memory as WasmiMemory, Module as WasmiModule,  TypedFunc as WasmiTypedFunc,
-    TypedFunc,
+    core::ValType, AsContext, AsContextMut, Caller as WasmiCaller, ExternType as WasmiExternType,
+    Func as WasmiFunc, Global as WasmiGlobal, Instance as WasmiInstance, Memory as WasmiMemory,
+    Module as WasmiModule, TypedFunc as WasmiTypedFunc, TypedFunc,
 };
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
@@ -46,7 +48,6 @@ impl fmt::Display for ViewEngine {
 
 const EXPORT_MAIN: &str = "smart_nft_main";
 const EXPORT_VIEW: &str = "smart_nft_view";
-const EXPORT_ACQUIRE: &str = "smart_nft_acquire";
 const EXPORT_VIEW_CANVAS: &str = "smart_nft_view_canvas";
 const EXPORT_VIEW_COMMAND: &str = "smart_nft_view_command";
 const EXPORT_LIMITS: &str = "smart_nft_limits";
@@ -54,7 +55,6 @@ const EXPORT_LIMITS: &str = "smart_nft_limits";
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum Export {
     Main,
-    Acquire(),
     View(ViewEngine),
     User(String),
 }
@@ -75,7 +75,6 @@ impl Into<String> for Export {
     fn into(self) -> String {
         match self {
             Self::Main => EXPORT_MAIN.to_owned(),
-            Self::Acquire() => EXPORT_ACQUIRE.to_owned(),
             Self::View(view) => format!("View({})", view),
             Self::User(name) => format!("User({})", name),
         }
@@ -109,6 +108,9 @@ const IMPORT_MODULES_HIDDEN_SET: &str = "smartnft_modules_hidden_set";
 const IMPORT_MODULES_ATTR_GET: &str = "smart_nft_attr_get";
 const IMPORT_MODULES_ATTR_SET: &str = "smart_nft_attr_set";
 
+const IMPORT_MELT_GET: &str = "smart_nft_melt_get";
+const IMPORT_MELT: &str = "smart_nft_melt";
+
 #[derive(CandidType, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum ImportName {
     MemoryKeys,
@@ -127,6 +129,9 @@ pub enum ImportName {
 
     AttrGet,
     AttrSet,
+
+    MeltGet,
+    Melt,
 }
 
 impl Into<String> for ImportName {
@@ -148,6 +153,9 @@ impl Into<String> for ImportName {
 
             Self::AttrGet => IMPORT_MODULES_ATTR_GET.into(),
             Self::AttrSet => IMPORT_MODULES_ATTR_SET.into(),
+
+            Self::MeltGet => IMPORT_MELT_GET.into(),
+            Self::Melt => IMPORT_MELT.into(),
         };
 
         import_name.replace("_", "")
@@ -270,6 +278,118 @@ fn get_full_import_name(search: ImportName, imports: &[Import]) -> Option<String
     }
 
     name.unwrap()
+}
+
+macro_rules! define_import_get_primitive_val {
+    ($func_name:ident, $ret_type:ty) => {
+        pub fn $func_name(
+            name: ImportName,
+            imports: &[Import],
+            store: &mut WasmiStore,
+            linker: &mut WasmiLinker,
+            f: impl Fn() -> $ret_type + Sync + Send + 'static,
+        ) {
+            let import_fn_full_name = get_full_import_name(name, imports);
+
+            if import_fn_full_name.is_none() {
+                return;
+            }
+
+            let import_fn = WasmiFunc::wrap(
+                &mut *store,
+                move |caller: WasmiCaller<'_, StoreState>| -> $ret_type { f() },
+            );
+
+            let import_fn_full_name = import_fn_full_name.unwrap();
+
+            linker
+                .define("wbg", &import_fn_full_name, import_fn)
+                .expect(&format!(
+                    "{} can't export {}",
+                    stringify!($func_name),
+                    import_fn_full_name
+                ));
+        }
+    };
+}
+
+define_import_get_primitive_val!(define_import_get_i32_val, i32);
+
+// pub fn define_import_get_primitive_val(
+//     name: ImportName,
+//     imports: &[Import],
+//     store: &mut WasmiStore,
+//     linker: &mut WasmiLinker,
+//     f: impl Fn() -> i32 + std::marker::Sync + Send + 'static,
+// ) {
+//     let import_fn_full_name = get_full_import_name(name, imports);
+
+//     if import_fn_full_name.is_none() {
+//         return;
+//     }
+
+//     let import_fn = WasmiFunc::wrap(
+//         &mut *store,
+//         move |caller: WasmiCaller<'_, StoreState>| {
+//             f() as i32
+//         },
+//     );
+
+//     let import_fn_full_name = import_fn_full_name.unwrap();
+
+//     linker
+//         .define("wbg", &import_fn_full_name, import_fn)
+//         .expect(&format!(
+//             "define_import_get_primitive_val can't export {}",
+//             import_fn_full_name
+//         ));
+// }
+
+// pub fn define_import_get_primitive_val<T>(
+//     name: String,
+//     store: &mut WasmiStore,
+//     linker: &mut WasmiLinker,
+//     f: impl Fn() -> T + Sync + Send + 'static,
+// ) where
+//     T: ValType + Copy + Sync + Send + 'static, // Ensure T can be converted to `Value`
+// {
+//     let import_fn = WasmiFunc::wrap(&mut *store, move |caller: WasmiCaller<'_, StoreState>| {
+//         let result: T = f();
+//         result.into() // Convert the result into `Value`
+//     });
+
+//     linker.define("wbg", &name, import_fn).expect(&format!(
+//         "define_import_get_primitive_val can't export {}",
+//         name
+//     ));
+// }
+
+pub fn define_import_set_primitive_val(
+    name: ImportName,
+    imports: &[Import],
+    store: &mut WasmiStore,
+    linker: &mut WasmiLinker,
+    f: impl Fn(i32) -> bool + std::marker::Sync + Send + 'static,
+) {
+    let import_fn_full_name = get_full_import_name(name, imports);
+
+    if import_fn_full_name.is_none() {
+        return;
+    }
+
+    let import_fn = WasmiFunc::wrap(
+        &mut *store,
+        move |caller: WasmiCaller<'_, StoreState>, val: i32| f(val) as i32,
+    );
+
+    let import_fn_full_name = import_fn_full_name.unwrap();
+
+    linker
+        .define("wbg", &import_fn_full_name, import_fn)
+        .expect(&format!(
+            "define_import_set_primitive_val can't export {}",
+            import_fn_full_name
+        ));
 }
 
 pub fn define_import_set_buf_val(
@@ -584,7 +704,11 @@ pub fn define_import_fn_set_buf_val_by_str_key(
 
     let import_fn = WasmiFunc::wrap(
         &mut *store,
-        move |mut caller: WasmiCaller<'_, StoreState>, ptr1: i32, len1: i32, ptr2: i32, len2: i32| {
+        move |mut caller: WasmiCaller<'_, StoreState>,
+              ptr1: i32,
+              len1: i32,
+              ptr2: i32,
+              len2: i32| {
             let malloc_fn = caller
                 .get_export("__wbindgen_malloc")
                 .expect("failed to find malloc_fn")

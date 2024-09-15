@@ -21,11 +21,9 @@ dfx canister install \
     --yes \
     nft1_backend
 
-# ----------
-# MINT NFT 0
-# ----------
-
+echo "-------------"
 echo "Minting NFT 1"
+echo "-------------"
 
 program_canvas=$(node ./scripts/programs/load.js program_basic_canvas_bg)
 
@@ -36,11 +34,9 @@ principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
 dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {1}; modules_hidden=opt vec {} })"
 
-# ------
-# MINT 1
-# ------
-
+echo "-------------"
 echo "Minting NFT 2"
+echo "-------------"
 
 program_command=$(node ./scripts/programs/load.js program_basic_command_bg)
 
@@ -50,5 +46,19 @@ contents='record {"Preview"; "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAA
 principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
 dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {2}; modules_hidden=opt vec {0} })"
+
+
+echo "-------------"
+echo "Minting NFT 3"
+echo "-------------"
+
+program_melt=$(node ./scripts/programs/load.js program_basic_melt_bg)
+
+dfx canister call nft1_backend mint_exec "(record {program=$program_melt})"
+
+contents='record {"Preview"; "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEX/+b0At+9wrnH+AAAAGklEQVQI12NAA4z//zdgEA+AElQlcFiEBQAAQvEi6s0oFU0AAAAASUVORK5CYII="}'
+principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
+
+dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {3}; modules_hidden=opt vec {0} })"
 
 dfx deploy nft1_backend

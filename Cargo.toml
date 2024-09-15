@@ -1,8 +1,14 @@
 [workspace]
 members = [
   "src/nft1_backend",
+  "src/program_basic_melt",
   "src/program_basic_main",
   "src/program_basic_canvas",
   "src/program_basic_command",
 ]
 resolver = "2"
+
+[profile.release]
+lto = true
+opt-level = "s"
+panic = "abort"

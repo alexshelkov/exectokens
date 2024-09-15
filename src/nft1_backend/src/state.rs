@@ -2,11 +2,15 @@ use crate::attrs::{Attr, AttrVal};
 use crate::contents::{ContentHeader, HeaderBase};
 use crate::contents::{Contents, ContentsCreate};
 use crate::engine::{with_wasmi, WasmiLinker, WasmiStore};
+use crate::memory::{Memory, MEM_IDS};
+use crate::nft::{
+    Collection, NftCreate, NftData, NftExecs, NftId, NftMemory, NftOwnedId, NftOwners, OwnerNfts,
+};
 use crate::program::{
     define_import_fn_get_buf_val, define_import_fn_get_buf_val_by_str_key,
     define_import_fn_get_buf_val_by_u8_key, define_import_fn_set_buf_val_by_str_key,
-    define_import_set_buf_val, define_import_set_buf_val_by_u8_key, DataModule, Export, Import,
-    ImportName, Module, ModuleId,
+    define_import_get_i32_val, define_import_set_buf_val, define_import_set_buf_val_by_u8_key,
+    define_import_set_primitive_val, DataModule, Export, Import, ImportName, Module, ModuleId,
 };
 use anyhow::{anyhow, Result};
 use candid::types::result;
@@ -15,8 +19,7 @@ use ciborium;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::vec;
 use ic_stable_structures::{
-    storable::{Blob, Bound},
-    DefaultMemoryImpl, StableBTreeMap, StableCell, StableLog, StableMinHeap, StableVec, Storable,
+    DefaultMemoryImpl, StableBTreeMap, StableCell, StableLog, StableMinHeap, StableVec,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,299 +33,66 @@ use wasmi::{
     TypedFunc as WasmiTypedFunc,
 };
 
-#[derive(CandidType, Deserialize, Clone)]
-pub struct CollectionState {
-    pub name: String,
-    pub logo: Option<Contents>,
-    pub symbol: String,
-    pub author: String,
-}
-
-impl Default for CollectionState {
-    fn default() -> Self {
-        Self {
-            name: String::from(""),
-            logo: None,
-            symbol: String::from(""),
-            author: String::from(""),
-        }
-    }
-}
-
-impl Storable for CollectionState {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-pub struct NftDataCreate {
-    pub owner: Principal,
-    pub acquired: bool,
-    pub executions: Option<u64>,
-    pub refills: Option<u64>,
-    pub attrs: Vec<Attr>,
-    pub contents: Vec<ContentsCreate>,
-    pub modules: Vec<ModuleId>,
-    pub modules_hidden: Option<Vec<ModuleId>>,
-}
-
-#[derive(CandidType, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NftOwnedId(pub NftId, pub Principal);
-
-impl Storable for NftOwnedId {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Bounded {
-        max_size: size_of::<NftOwnedId>() as u32,
-        is_fixed_size: false,
-    };
-}
-
-#[derive(CandidType, Deserialize, Clone, Debug)]
-struct NftOwners(Vec<Principal>);
-
-impl Storable for NftOwners {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-#[derive(CandidType, Deserialize, Clone, Debug)]
-struct OwnerNfts(Vec<NftId>);
-
-impl Storable for OwnerNfts {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-#[derive(CandidType, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct NftId(pub u128, pub u8, pub u8);
-
-impl Storable for NftId {
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Bounded {
-        max_size: size_of::<NftId>() as u32,
-        is_fixed_size: false,
-    };
-}
-
-impl From<u128> for NftId {
-    fn from(value: u128) -> Self {
-        Self(value, 0, 0)
-    }
-}
-
-impl Into<u128> for NftId {
-    fn into(self) -> u128 {
-        self.0
-    }
-}
-
-#[derive(CandidType, Deserialize, Clone)]
-pub struct NftData {
-    pub id: NftId,
-    // pub owner: Principal,
-    pub acquired: bool,
-    // pub executions: Option<u64>,
-    // pub refills: Option<u64>,
-    pub attrs: Vec<Attr>,
-    pub contents: Vec<u8>,
-    pub contents_headers: Vec<ContentHeader>,
-    pub modules: Vec<ModuleId>,
-    pub modules_hidden: Vec<ModuleId>,
-}
-
-impl NftData {
-    pub fn get_all_modules(&self) -> Vec<ModuleId> {
-        [self.modules.clone(), self.modules_hidden.clone()].concat()
-    }
-}
-
-impl Storable for NftData {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
-pub struct NftMemory(pub HashMap<u8, Vec<u8>>);
-
-impl Default for NftMemory {
-    fn default() -> Self {
-        NftMemory(HashMap::default())
-    }
-}
-
-impl Storable for NftMemory {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-type Memory = VirtualMemory<DefaultMemoryImpl>;
-
-const MEMORY_ID_NFT_LAST_ID: MemoryId = MemoryId::new(0);
-
-const MEMORY_ID_COLLECTION: MemoryId = MemoryId::new(1);
-
-const MEMORY_ID_MODULES: MemoryId = MemoryId::new(2);
-
-const MEMORY_ID_MODULE_LAST_D: MemoryId = MemoryId::new(3);
-
-const MEMORY_ID_MODULES_DATA: MemoryId = MemoryId::new(4);
-
-const MEMORY_ID_NFTS: MemoryId = MemoryId::new(5);
-
-const MEMORY_ID_NFT_OWNERS: MemoryId = MemoryId::new(6);
-const MEMORY_ID_OWNER_NFTS: MemoryId = MemoryId::new(7);
-
-const MEMORY_ID_NFT_MEMORY: MemoryId = MemoryId::new(8);
-
-const MEMORY_ID_NFT_EXEC: MemoryId = MemoryId::new(9);
-
 thread_local! {
-    static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
-        RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
-
-    pub static COLLECTION: RefCell<StableCell<CollectionState, Memory>> = RefCell::new(
-        StableCell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_COLLECTION)), CollectionState::default())
+    pub static COLLECTION: RefCell<StableCell<Collection, Memory>> = RefCell::new(
+        StableCell::init(MEM_IDS.collection(), Collection::default())
             .expect("COLLECTION stable memory initialization failed")
     );
 
     pub static MODULES: RefCell<StableBTreeMap<u32, Module, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_MODULES)),
+            MEM_IDS.modules()
         )
     );
 
     pub static MODULES_DATA: RefCell<StableBTreeMap<u32, Vec<u8>, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_MODULES_DATA)),
+            MEM_IDS.modules_data()
         )
     );
 
     pub static MODULES_LAST_ID: RefCell<StableCell<u32, Memory>> = RefCell::new(
-        StableCell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_MODULE_LAST_D)), 0)
+        StableCell::init(MEM_IDS.modules_last_id(), 0)
             .expect("MODULES_LAST_ID stable memory config initialization failed")
     );
 
     pub static NFT_LAST_ID: RefCell<StableCell<u128, Memory>> = RefCell::new(
-        StableCell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_NFT_LAST_ID)), 0)
+        StableCell::init(MEM_IDS.nft_last_id(), 0)
             .expect("NFT_LAST_ID stable memory config initialization failed")
     );
 
     pub static NFTS_DATA: RefCell<StableBTreeMap<NftId, NftData, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_NFTS)),
+            MEM_IDS.nfts_data(),
         )
     );
 
     pub static NFTS_OWNERS: RefCell<StableBTreeMap<NftId, NftOwners, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_NFT_OWNERS)),
+            MEM_IDS.nfts_owners()
         )
     );
 
     pub static OWNER_NFTS: RefCell<StableBTreeMap<Principal, OwnerNfts, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_OWNER_NFTS)),
+            MEM_IDS.owner_nfts()
         )
     );
 
     pub static NFTS_MEMORY: RefCell<StableBTreeMap<NftOwnedId, NftMemory, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_NFT_MEMORY)),
+            MEM_IDS.nfts_memory()
         )
     );
 
-    pub static NFTS_EXECS: RefCell<StableBTreeMap<NftOwnedId, ExecLimits, Memory>> = RefCell::new(
+    pub static NFTS_EXECS: RefCell<StableBTreeMap<NftOwnedId, NftExecs, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_NFT_EXEC)),
+            MEM_IDS.nfts_execs()
         )
     );
 }
 
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
-pub struct ExecLimits {
-    pub refills: Option<u64>,
-    pub executions: Option<u64>,
-}
-
-impl ExecLimits {
-    fn default() -> Self {
-        Self {
-            refills: None,
-            executions: None,
-        }
-    }
-}
-
-impl From<(Option<u64>, Option<u64>)> for ExecLimits {
-    fn from(item: (Option<u64>, Option<u64>)) -> Self {
-        Self {
-            refills: item.0,
-            executions: item.1,
-        }
-    }
-}
-
-impl Storable for ExecLimits {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-pub fn with_collection<R>(f: impl FnOnce(&CollectionState) -> R) -> R {
+pub fn with_collection<R>(f: impl FnOnce(&Collection) -> R) -> R {
     COLLECTION.with(|cell| f(cell.borrow().get()))
 }
 
@@ -368,7 +138,7 @@ pub fn get_data_modules(nft_modules: Vec<ModuleId>) -> Vec<DataModule> {
     data_modules
 }
 
-pub fn update_collection(collection: CollectionState) {
+pub fn update_collection(collection: Collection) {
     COLLECTION.with(|collection_state| {
         collection_state
             .borrow_mut()
@@ -387,6 +157,10 @@ pub fn nft_contents_get(id: NftId) -> Option<(Vec<ContentHeader>, Vec<u8>)> {
     Some((nft_data.contents_headers, nft_data.contents))
 }
 
+pub fn nft_melt_get(id: NftId) -> Option<bool> {
+    nft_data_get(id).map(|nft_data| nft_data.melted)
+}
+
 pub fn nft_modules_get(id: NftId) -> Option<(Vec<ModuleId>, Vec<ModuleId>)> {
     let nft_data = nft_data_get(id);
 
@@ -395,6 +169,10 @@ pub fn nft_modules_get(id: NftId) -> Option<(Vec<ModuleId>, Vec<ModuleId>)> {
 
 pub fn nft_memory_get(id: NftOwnedId) -> Option<NftMemory> {
     NFTS_MEMORY.with(|nfts_memory| nfts_memory.borrow().get(&id))
+}
+
+pub fn nft_exec_get(id: NftOwnedId) -> Option<NftExecs> {
+    NFTS_EXECS.with(|nfts_execs| nfts_execs.borrow().get(&id))
 }
 
 pub fn nft_memory_get_by_key(id: NftOwnedId, key: u8) -> Vec<u8> {
@@ -453,8 +231,8 @@ pub fn nft_contents_headers_set(id: NftId, data: Vec<ContentHeader>) -> bool {
 
         let mut nft_data = nft_data.unwrap();
 
-        // can't change contents of acquired nft
-        if nft_data.acquired {
+        // can't change contents of melted nft
+        if nft_data.melted {
             return false;
         }
 
@@ -482,8 +260,8 @@ pub fn nft_contents_set(id: NftId, data: Vec<u8>) -> bool {
 
         let mut nft_data = nft_data.unwrap();
 
-        // can't change contents of acquired nft
-        if nft_data.acquired {
+        // can't change contents of melted nft
+        if nft_data.melted {
             return false;
         }
 
@@ -501,6 +279,35 @@ pub fn nft_contents_set(id: NftId, data: Vec<u8>) -> bool {
     res
 }
 
+pub fn nft_melt_set(id: NftId) -> bool {
+    let res = NFTS_DATA.with(|nfts_data| {
+        let nft_data = nfts_data.borrow().get(&id);
+
+        if nft_data.is_none() {
+            return false;
+        }
+
+        let mut nft_data = nft_data.unwrap();
+
+        // can't change contents of melted nft
+        if nft_data.melted {
+            return false;
+        }
+
+        nft_data.melted = true;
+
+        nfts_data.borrow_mut().insert(id, nft_data);
+
+        return true;
+    });
+
+    // TODO: dbg
+    let current = nft_data_get(id);
+    ic_cdk::println!("current melted {:?}", current.map(|c| c.melted));
+
+    res
+}
+
 pub fn nft_modules_set(id: NftId, modules_ids: Vec<ModuleId>, hidden: bool) -> bool {
     NFTS_DATA.with(|nfts_data| {
         let nft_data = nfts_data.borrow().get(&id);
@@ -511,8 +318,8 @@ pub fn nft_modules_set(id: NftId, modules_ids: Vec<ModuleId>, hidden: bool) -> b
 
         let mut nft_data = nft_data.unwrap();
 
-        // can't change modules of acquired nft
-        if nft_data.acquired {
+        // can't change modules of melted nft
+        if nft_data.melted {
             return false;
         }
 
@@ -548,8 +355,8 @@ pub fn nft_attr_set(id: NftId, key: String, val: AttrVal) -> bool {
 
         let mut nft_data = nft_data.unwrap();
 
-        // can't change attr of acquired nft
-        if nft_data.acquired {
+        // can't change attr of melted nft
+        if nft_data.melted {
             return false;
         }
 
@@ -566,8 +373,6 @@ pub fn nft_attr_set(id: NftId, key: String, val: AttrVal) -> bool {
             return true;
         }
 
-        // nfts_data.borrow_mut().insert(id, nft_data);
-
         return false;
     });
 
@@ -578,7 +383,15 @@ pub fn nft_attr_set(id: NftId, key: String, val: AttrVal) -> bool {
     res
 }
 
-pub fn list_nfts(owner: Principal) -> Vec<(NftData, NftMemory)> {
+pub fn nft_get(id: NftOwnedId) -> Option<(NftData, NftExecs, NftMemory)> {
+    let nft_data = nft_data_get(id.0)?;
+    let nft_execs = nft_exec_get(id)?;
+    let nft_mem = nft_memory_get(id)?;
+
+    Some((nft_data, nft_execs, nft_mem))
+}
+
+pub fn list_nfts(owner: Principal) -> Vec<(NftData, NftExecs, NftMemory)> {
     OWNER_NFTS.with(|owner_nfts| {
         let nfts = owner_nfts.borrow().get(&owner);
 
@@ -590,12 +403,7 @@ pub fn list_nfts(owner: Principal) -> Vec<(NftData, NftMemory)> {
             .unwrap()
             .0
             .into_iter()
-            .map(|nft_id| {
-                let nft_data = nft_data_get(nft_id)?;
-                let nft_mem = nft_memory_get(NftOwnedId(nft_id, owner))?;
-
-                Some((nft_data, nft_mem))
-            })
+            .map(|nft_id| nft_get(NftOwnedId(nft_id, owner)))
             .collect();
 
         let mut result = vec![];
@@ -610,16 +418,17 @@ pub fn list_nfts(owner: Principal) -> Vec<(NftData, NftMemory)> {
     })
 }
 
-pub fn create_nft(args: NftDataCreate) -> Option<NftId> {
+pub fn create_nft(args: NftCreate) -> Option<NftId> {
     let (contents_headers, contents) = Contents::create_many(args.contents)?;
 
     let id: u128 = nft_inc_id();
     let id: NftId = id.into();
     let owner = args.owner;
+    let id_owned = NftOwnedId(id, args.owner);
 
     let nft_data = NftData {
         id,
-        acquired: args.acquired,
+        melted: args.melted,
         attrs: args.attrs,
         contents_headers: contents_headers,
         contents: contents,
@@ -627,10 +436,18 @@ pub fn create_nft(args: NftDataCreate) -> Option<NftId> {
         modules_hidden: args.modules_hidden.unwrap_or(vec![]),
     };
 
-    let id_owned = NftOwnedId(id, args.owner);
-
     NFTS_DATA.with(|nfts_data| {
         nfts_data.borrow_mut().insert(id, nft_data);
+    });
+
+    NFTS_EXECS.with(|nfts_execs| {
+        let nfts_execs = nfts_execs.borrow_mut().insert(
+            id_owned,
+            NftExecs {
+                executions: args.executions,
+                refills: args.refills,
+            },
+        );
     });
 
     NFTS_MEMORY.with(|memory| {
@@ -712,6 +529,24 @@ fn define_nft_modules(
     store: &mut WasmiStore,
     linker: &mut WasmiLinker,
 ) {
+    // Melting
+
+    define_import_get_i32_val(
+        ImportName::MeltGet,
+        &imports,
+        &mut *store,
+        &mut *linker,
+        move || nft_melt_get(nft_id).unwrap_or(false) as i32,
+    );
+
+    define_import_set_primitive_val(
+        ImportName::Melt,
+        &imports,
+        &mut *store,
+        &mut *linker,
+        move |_| nft_melt_set(nft_id),
+    );
+
     // Memory
 
     define_import_fn_get_buf_val(

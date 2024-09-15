@@ -666,6 +666,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "program_basic_melt"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "panic-halt",
+ "panic-never",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "psm"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"

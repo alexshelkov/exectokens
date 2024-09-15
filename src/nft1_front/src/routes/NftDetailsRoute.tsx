@@ -4,7 +4,6 @@ import NftDetails from '@/components/feature/NftDetails';
 import { SmartNftModule } from '@/nft';
 import { CollectionAttrs, Nft } from '@/routes/types';
 import { rootRoute } from '@/routes/RootRoute';
-import { useRef } from 'react';
 
 export interface NftDetailsLoader {
   nft: Nft;
@@ -19,7 +18,7 @@ export const nftDetailsRoute = createRoute({
   loader: async ({ params: { canisterId, nftId }, context: { SmartView } }) => {
     const Canister = await SmartView(canisterId);
 
-    const collectionAttrs = await Canister.collection();
+    const collectionAttrs = (await Canister.collection()) as CollectionAttrs;
 
     const { viewNft, getExecPublic } = Canister.view(BigInt(nftId));
 
@@ -41,15 +40,7 @@ export const nftDetailsRoute = createRoute({
 export default function NftDetailsRoute() {
   const { collectionAttrs, nft, modules } = nftDetailsRoute.useLoaderData();
 
-  
-
   return (
-    <div className="pt-2 w-full">
-      <NftDetails
-        collectionAttrs={collectionAttrs}
-        nft={nft}
-        modules={modules}
-      />
-    </div>
+    <NftDetails collectionAttrs={collectionAttrs} nft={nft} modules={modules} />
   );
 }
