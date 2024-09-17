@@ -6,7 +6,6 @@ export const idlFactory = ({ IDL }) => {
     'symbol' : IDL.Text,
     'program' : IDL.Text,
   });
-  const AcquireArgs = IDL.Record({ 'id' : IDL.Nat });
   const ContentRole = IDL.Variant({
     'Preview' : IDL.Null,
     'Logo' : IDL.Null,
@@ -18,7 +17,7 @@ export const idlFactory = ({ IDL }) => {
     'role' : ContentRole,
     'start' : IDL.Nat32,
   });
-  const CollectionState = IDL.Record({
+  const Collection = IDL.Record({
     'logo' : IDL.Opt(IDL.Tuple(ContentHeader, IDL.Vec(IDL.Nat8))),
     'name' : IDL.Text,
     'author' : IDL.Text,
@@ -28,6 +27,7 @@ export const idlFactory = ({ IDL }) => {
     'id' : IDL.Nat,
     'command' : IDL.Vec(IDL.Nat8),
   });
+  const GetExecArgs = IDL.Record({ 'id' : IDL.Nat });
   const ViewEngine = IDL.Variant({
     'Empty' : IDL.Null,
     'Command' : IDL.Null,
@@ -37,7 +37,6 @@ export const idlFactory = ({ IDL }) => {
     'Main' : IDL.Null,
     'User' : IDL.Text,
     'View' : ViewEngine,
-    'Acquire' : IDL.Record({}),
   });
   const Import = IDL.Variant({
     'ImportFn' : IDL.Record({
@@ -70,37 +69,36 @@ export const idlFactory = ({ IDL }) => {
   const Attr = IDL.Record({ 'val' : AttrVal, 'name' : IDL.Text });
   const Nft = IDL.Record({
     'id' : IDL.Nat,
+    'melted' : IDL.Bool,
     'memory' : IDL.Vec(IDL.Tuple(IDL.Nat8, IDL.Vec(IDL.Nat8))),
     'attrs' : IDL.Vec(Attr),
     'contents' : IDL.Vec(IDL.Nat8),
-    'executions' : IDL.Opt(IDL.Nat),
-    'acquires' : IDL.Opt(IDL.Nat64),
+    'executions' : IDL.Opt(IDL.Nat64),
     'contents_headers' : IDL.Vec(ContentHeader),
     'contents_byte_size' : IDL.Nat64,
-    'refills' : IDL.Opt(IDL.Nat),
+    'refills' : IDL.Opt(IDL.Nat64),
     'modules' : IDL.Vec(IDL.Nat32),
   });
   const ListArgs = IDL.Record({ 'owner' : IDL.Principal });
   const MintArgs = IDL.Record({
+    'melted' : IDL.Opt(IDL.Bool),
     'attrs' : IDL.Vec(Attr),
     'contents' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)),
     'owner' : IDL.Principal,
     'executions' : IDL.Opt(IDL.Nat64),
     'modules_hidden' : IDL.Opt(IDL.Vec(IDL.Nat32)),
-    'acquired' : IDL.Opt(IDL.Bool),
     'refills' : IDL.Opt(IDL.Nat64),
     'modules' : IDL.Vec(IDL.Nat32),
   });
-  const MintError = IDL.Variant({ 'NftDataCreateError' : IDL.Null });
+  const MintError = IDL.Variant({ 'NftCreateError' : IDL.Null });
   const Result = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : MintError });
   const MintExecArgs = IDL.Record({ 'program' : IDL.Text });
   return IDL.Service({
-    'acquire' : IDL.Func([AcquireArgs], [IDL.Opt(IDL.Null)], []),
-    'collection_attrs' : IDL.Func([], [CollectionState], ['query']),
+    'collection_attrs' : IDL.Func([], [Collection], ['query']),
     'exec' : IDL.Func([ExecArgs], [IDL.Opt(IDL.Vec(IDL.Nat8))], []),
-    'get_exec' : IDL.Func([AcquireArgs], [], []),
+    'get_exec' : IDL.Func([GetExecArgs], [], []),
     'get_exec_public' : IDL.Func(
-        [AcquireArgs],
+        [GetExecArgs],
         [IDL.Opt(IDL.Vec(IDL.Tuple(Module, IDL.Vec(IDL.Nat8))))],
         [],
       ),

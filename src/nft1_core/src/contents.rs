@@ -1,4 +1,4 @@
-use candid::{CandidType, Decode, Encode, Principal};
+use candid::CandidType;
 use data_url::{forgiving_base64::InvalidBase64, mime, DataUrl, DataUrlError};
 
 #[derive(Debug)]
@@ -9,7 +9,7 @@ pub enum Base64Err {
 
 fn base64_to_buf(value: String) -> Result<(String, Vec<u8>), Base64Err> {
     let url = DataUrl::process(&value).map_err(|err| Base64Err::DataUrlError(err))?;
-    let (body, fragment) = url
+    let (body, _) = url
         .decode_to_vec()
         .map_err(|err| Base64Err::InvalidBase64(err))?;
 
@@ -95,7 +95,7 @@ impl ContentHeader {
             } else {
                 return None;
             }
-        };
+        }
 
         Some(headers)
     }
@@ -111,7 +111,7 @@ impl ContentHeader {
         let mime = String::from_utf8(mime_buf).ok()?;
 
         let mut header_end = 13 + mime_len;
-        
+
         let role: ContentRole;
 
         if value[0] == 0 {
@@ -172,7 +172,6 @@ impl Into<Vec<u8>> for ContentHeader {
 
         encoded.extend(mime_len);
         encoded.append(&mut mime);
-
 
         if let Some(role_name) = role_name {
             let mut name = role_name.into_bytes();

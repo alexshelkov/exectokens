@@ -1,13 +1,12 @@
 import { createRoute } from '@tanstack/react-router';
 
 import NftDetails from '@/components/feature/NftDetails';
-import { SmartNftModule } from '@/nft';
-import { CollectionAttrs, Nft } from '@/routes/types';
+import { SmartNft, SmartCollection, SmartNftModule } from '@/nft/core';
 import { rootRoute } from '@/routes/RootRoute';
 
 export interface NftDetailsLoader {
-  nft: Nft;
-  collectionAttrs: CollectionAttrs;
+  nft: SmartNft;
+  collectionAttrs: SmartCollection;
   modules: SmartNftModule[];
 }
 
@@ -18,20 +17,13 @@ export const nftDetailsRoute = createRoute({
   loader: async ({ params: { canisterId, nftId }, context: { SmartView } }) => {
     const Canister = await SmartView(canisterId);
 
-    const collectionAttrs = (await Canister.collection()) as CollectionAttrs;
+    const collectionAttrs = await Canister.collection();
 
     const { viewNft, getExecPublic } = Canister.view(BigInt(nftId));
 
-    const nftData = await viewNft();
-
-    const thumbUrl = URL.createObjectURL(nftData.preview);
+    const nft = await viewNft();
 
     const modules = await getExecPublic();
-
-    const nft = {
-      nft: nftData,
-      thumbUrl
-    };
 
     return { collectionAttrs, nft, modules };
   }

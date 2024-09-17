@@ -7,8 +7,6 @@ extern crate ic_cdk_macros;
 extern crate serde;
 
 mod memory;
-mod contents;
-mod attrs;
 mod canister;
 mod engine;
 mod nft;

@@ -1,7 +1,7 @@
 import { createRootRouteWithContext, useRouter } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 
-import { Dashboard } from '@/Ui';
+import { Layout } from '@/components/blocks/Layout';
 import { SmartView } from '@/nft';
 
 const ErrorComponent = ({ error }: { error: Error }) => {
@@ -9,25 +9,27 @@ const ErrorComponent = ({ error }: { error: Error }) => {
 
   return (
     <div>
-      {error.message}
-      <button
-        onClick={() => {
-          router.invalidate();
-        }}
-      >
-        retry
-      </button>
+      <div>{error.message}</div>
+      <div>
+        <button
+          onClick={() => {
+            router.invalidate();
+          }}
+        >
+          retry
+        </button>
+      </div>
     </div>
   );
-}
+};
 
 export const rootRoute = createRootRouteWithContext<{
-  SmartView: SmartView
+  SmartView: SmartView;
 }>()({
   component: () => (
     <>
-      <Dashboard />
-      <TanStackRouterDevtools position="bottom-right"/>
+      <Layout />
+      <TanStackRouterDevtools position="bottom-right" />
     </>
   ),
   errorComponent: ErrorComponent

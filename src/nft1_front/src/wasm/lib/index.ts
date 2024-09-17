@@ -170,8 +170,9 @@ const createSimpleImports = (
           return f(a, state.b, ...args);
         } finally {
           if (--state.cnt === 0) {
-            wasmGet()[wbindgen_export].get(state.dtor)(a, state.b);
-            CLOSURE_DTORS.unregister(state);
+            // TODO: this is unsolvable without removing wasm bindgen
+            // wasmGet()[wbindgen_export].get(state.dtor)(a, state.b);
+            // CLOSURE_DTORS.unregister(state);
           } else {
             state.a = a;
           }
@@ -355,7 +356,8 @@ const createSimpleImports = (
       {
         check: /_wbindgen_closure_/,
         fn(arg0: any, arg1: any) {
-          const ret = makeMutClosure(arg0, arg1, 9, __wbg_adapter_20);
+          // TODO: the magic number 22 is impossible to get also check makeMutClosure itself
+          const ret = makeMutClosure(arg0, arg1, 22, __wbg_adapter_20);
           return addHeapObject(ret);
         }
       }

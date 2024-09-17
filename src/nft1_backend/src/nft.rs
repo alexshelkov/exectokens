@@ -1,12 +1,12 @@
-use crate::{
-    attrs::Attr,
-    contents::{ContentHeader, Contents, ContentsCreate},
-    program::{Module, ModuleId},
-};
+use crate::program::{Module, ModuleDesc, ModuleDescCreate, ModuleId, ModuleTag};
 use candid::{CandidType, Decode, Encode, Principal};
 use ic_stable_structures::{
     storable::{Blob, Bound},
-    Storable,
+    vec, Storable,
+};
+use nft1_core::{
+    attrs::{Attr, AttrVal},
+    contents::{ContentHeader, Contents, ContentsCreate},
 };
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -79,8 +79,7 @@ pub struct NftCreate {
     pub refills: Option<u64>,
     pub attrs: Vec<Attr>,
     pub contents: Vec<ContentsCreate>,
-    pub modules: Vec<ModuleId>,
-    pub modules_hidden: Option<Vec<ModuleId>>,
+    pub modules: Vec<ModuleDescCreate>,
 }
 
 #[derive(CandidType, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -108,13 +107,56 @@ pub struct NftData {
     pub attrs: Vec<Attr>,
     pub contents: Vec<u8>,
     pub contents_headers: Vec<ContentHeader>,
-    pub modules: Vec<ModuleId>,
-    pub modules_hidden: Vec<ModuleId>,
+    pub modules: Vec<ModuleDesc>,
 }
 
 impl NftData {
     pub fn get_all_modules(&self) -> Vec<ModuleId> {
-        [self.modules.clone(), self.modules_hidden.clone()].concat()
+        Self::get_modules(&self, ModuleTag::empty())
+    }
+
+    pub fn get_public_modules(&self) -> Vec<ModuleId> {
+        Self::get_modules(&self, ModuleTag::Public)
+    }
+
+    pub fn get_modules(&self, tag: ModuleTag) -> Vec<ModuleId> {
+        self.modules
+            .clone()
+            .into_iter()
+            .filter(|module_desc| {
+                let module_tag = module_desc.tag;
+
+                if module_tag.is_empty() || tag.is_empty() {
+                    return true;
+                }
+
+                module_tag.intersects(tag)
+            })
+            .map(|module_desc| module_desc.into())
+            .collect()
+    }
+
+    pub fn update_modules(&mut self, modules_ids: Vec<ModuleId>, tag: ModuleTag) {
+        let modules: Vec<ModuleDesc> = modules_ids
+            .into_iter()
+            .map(|module_id| (module_id, tag).into())
+            .collect();
+
+        if tag.is_empty() {
+            self.modules = modules;
+            return;
+        }
+
+        let mut updated_modules: Vec<ModuleDesc> = self
+            .modules
+            .clone()
+            .into_iter()
+            .filter(|module| !module.tag.intersects(tag))
+            .collect();
+
+        updated_modules.extend(modules);
+
+        self.modules = updated_modules;
     }
 }
 
@@ -147,6 +189,7 @@ pub struct Nft {
 impl From<(NftData, NftExecs, NftMemory)> for Nft {
     fn from((nft_data, nft_execs, nft_memory): (NftData, NftExecs, NftMemory)) -> Self {
         let contents_len = u64::try_from(nft_data.contents.len()).unwrap();
+        let modules = nft_data.get_modules(ModuleTag::empty());
 
         Self {
             id: nft_data.id.into(),
@@ -157,7 +200,7 @@ impl From<(NftData, NftExecs, NftMemory)> for Nft {
             contents_byte_size: contents_len,
             contents_headers: nft_data.contents_headers,
             contents: nft_data.contents,
-            modules: nft_data.modules,
+            modules: modules,
             memory: nft_memory,
         }
     }

@@ -1,57 +1,7 @@
-// import Image from 'next/image';
-// import Link from 'next/link';
-import {
-  CornerDownLeft,
-  ChevronLeft,
-  Home,
-  LineChart,
-  Package,
-  Package2,
-  PanelLeft,
-  PlusCircle,
-  Search,
-  Settings,
-  ShoppingCart,
-  Upload,
-  Users2
-} from 'lucide-react';
-
+import { CornerDownLeft, ChevronLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator
-} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -61,10 +11,10 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { forwardRef, useEffect, useRef, useState } from 'react';
-import { Command } from '@/components/feature/NftDetails';
-import { SmartNftViewName } from '@/nft';
+import { Label } from '@/components/ui/label';
+import { SmartNftViewName } from '@/nft/core';
+import BlobImage from '@/components/blocks/BlobImage';
 
 interface CommandInteractionsProps {
   commandsHistory: {
@@ -164,9 +114,13 @@ export const NftDetailsCard = forwardRef<
     name: string;
     symbol: string;
     id: bigint;
-    image: string;
+    image: Blob;
     alt: string;
     viewName?: SmartNftViewName;
+    attrs: {
+      name: string,
+      val: string
+    }[],
     modules: {
       name: string;
       size: number;
@@ -189,6 +143,7 @@ export const NftDetailsCard = forwardRef<
       image,
       alt,
       modules,
+      attrs,
       viewName,
       commandsHistory,
       onRun,
@@ -237,15 +192,47 @@ export const NftDetailsCard = forwardRef<
               </CardHeader>
               <CardContent className="">
                 <div className="grid gap-2">
-                  <img
-                    src={image}
-                    alt={alt}
-                    className="mx-auto object-contain w-full max-w-[700px] max-h-[700px]"
-                  />
+                  <BlobImage image={image} alt={alt} />
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          <Card x-chunk="dashboard-07-chunk-1" className="mb-4">
+            <CardHeader>
+              <CardTitle>Attributes</CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              <Table
+                className="overflow-x-scroll"
+                style={{ tableLayout: 'fixed' }}
+              >
+                <TableHeader className="w-full">
+                  <TableRow>
+                    <TableHead className="w-[150px]">Name</TableHead>
+                    <TableHead className="">Value</TableHead>
+                    {/* <TableHead className="">Exports</TableHead> */}
+                    {/* <TableHead className="w-[100px]">Size</TableHead> */}
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="w-full">
+                  {attrs.map(({ name, val  }) => {
+                    return (
+                      <TableRow key={name}>
+                        <TableCell className="w-[150px] font-semibold break-words">
+                          {name}
+                        </TableCell>
+                        <TableCell className="break-words">
+                          {val}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
           <Card x-chunk="dashboard-07-chunk-1">
             <CardHeader>
@@ -253,7 +240,10 @@ export const NftDetailsCard = forwardRef<
             </CardHeader>
 
             <CardContent>
-              <Table className="overflow-x-scroll" style={{tableLayout: 'fixed'}}>
+              <Table
+                className="overflow-x-scroll"
+                style={{ tableLayout: 'fixed' }}
+              >
                 <TableHeader className="w-full">
                   <TableRow>
                     <TableHead className="w-[150px]">Module</TableHead>

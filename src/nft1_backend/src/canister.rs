@@ -1,15 +1,17 @@
 use crate::{
-    attrs::Attr,
-    contents::{Contents, ContentsCreate},
     nft::{Collection, Nft, NftCreate, NftData, NftExecs, NftMemory, NftOwnedId},
-    program::{DataModule, Export, Module, ModuleId},
+    program::{DataModule, Export, Module, ModuleDesc, ModuleDescCreate, ModuleId},
     state::{
-        create_nft, exec_run, get_data_modules, get_module_by_export, get_module_code, list_nfts,
-        nft_data_get, nft_get, nft_get_id, nft_inc_id, nft_memory_get, update_collection,
-        update_modules, with_collection, COLLECTION, MODULES, MODULES_DATA, NFTS_DATA, NFT_LAST_ID,
+        create_nft, exec_run, get_data_modules, get_module_code, list_nfts, nft_data_get, nft_get,
+        nft_get_id, nft_inc_id, nft_memory_get, update_collection, update_modules, with_collection,
+        COLLECTION, MODULES, MODULES_DATA, NFTS_DATA, NFT_LAST_ID,
     },
 };
 use candid::{CandidType, Encode, Principal};
+use nft1_core::{
+    attrs::{Attr, AttrVal},
+    contents::{Contents, ContentsCreate},
+};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{
@@ -40,8 +42,7 @@ pub struct MintArgs {
     pub melted: Option<bool>,
     pub attrs: Vec<Attr>,
     pub contents: Vec<ContentsCreate>,
-    pub modules: Vec<ModuleId>,
-    pub modules_hidden: Option<Vec<ModuleId>>,
+    pub modules: Vec<ModuleDescCreate>,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -152,7 +153,6 @@ fn mint(args: MintArgs) -> Result<u128, MintError> {
         attrs: args.attrs,
         contents: args.contents,
         modules: args.modules,
-        modules_hidden: args.modules_hidden,
     };
 
     create_nft(nft_data_create)
@@ -205,7 +205,8 @@ fn get_exec_public(args: GetExecArgs) -> Option<Vec<DataModule>> {
     let nft_data = nft_data_get(args.id.into());
 
     nft_data.map(|nft_data| {
-        let data_modules = get_data_modules(nft_data.modules);
+        let modules_ids = nft_data.get_public_modules();
+        let data_modules = get_data_modules(modules_ids);
 
         data_modules
     })
@@ -218,12 +219,6 @@ fn get_exec(args: GetExecArgs) {}
 fn exec(args: ExecArgs) -> Option<Vec<u8>> {
     let owner = ic_cdk::caller();
 
-    ic_cdk::println!(
-        "{:?} {:?}",
-        Principal::anonymous().to_text(),
-        owner.to_text()
-    );
-
     let id_owned = NftOwnedId(args.id.into(), owner);
 
     exec_run(id_owned, args.command)
@@ -234,7 +229,7 @@ fn exec(args: ExecArgs) -> Option<Vec<u8>> {
 
 #[query(name = "ver")]
 fn ver() -> u32 {
-    10
+    26
 }
 
 ic_cdk::export_candid!();

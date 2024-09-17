@@ -45,7 +45,7 @@ const createSmartStore = () => {
     return item;
   };
 
-  const store = async (canisterId: string) => {
+  const create = async (canisterId: string) => {
     await open(canisterId);
 
     return {
@@ -57,10 +57,10 @@ const createSmartStore = () => {
   };
 
   return {
-    store
+    create
   };
 };
 
 export const SmartStore = createSmartStore();
 
-export type SmartStore = Awaited<ReturnType<typeof SmartStore['store']>>;
+export type SmartStore = Awaited<ReturnType<typeof SmartStore['create']>>;

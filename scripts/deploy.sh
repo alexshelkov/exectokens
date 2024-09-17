@@ -1,13 +1,32 @@
+#!/bin/bash
+
+opt_build=false
+opt_gen=false
+opt_dep=false
+opt_x=""
+
+while getopts bgdx: opt; do
+    case $opt in
+        b) opt_build=true ;;
+        g) opt_gen=true ;;
+        d) opt_dep=true ;;
+        x) opt_x=$OPTARG ;;
+        *) echo 'error in command line parsing' >&2
+           exit 1
+    esac
+done
+
 dfx canister uninstall-code nft1_backend
 
 set -e
 
 dfx canister create nft1_backend
 
-dfx build nft1_backend
+"$opt_build" && dfx build nft1_backend
+
 mkdir -p target/did/
 candid-extractor target/wasm32-unknown-unknown/release/nft1_backend.wasm > target/did/nft1_backend.did
-dfx generate nft1_backend
+"$opt_gen" && dfx generate nft1_backend
 
 # ------------------------------------------------------------------------------------------------------------------
 
@@ -32,7 +51,7 @@ dfx canister call nft1_backend mint_exec "(record {program=$program_canvas})"
 contents='record {"Preview"; "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEW1pdXtHCQ9Y5g7AAAAGklEQVQI12NAA4z//zdgEA/YCRBkacMksAAA87Qr4XDjZmAAAAAASUVORK5CYII="}'
 principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
-dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {1}; modules_hidden=opt vec {} })"
+dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {record { 1 };} })"
 
 echo "-------------"
 echo "Minting NFT 2"
@@ -45,7 +64,7 @@ dfx canister call nft1_backend mint_exec "(record {program=$program_command})"
 contents='record {"Preview"; "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEX15JwisUxzhw6qAAAAG0lEQVQI12NAA4z//zdgEA/YCRGY2sjRgQUAAHTZMD31tNU9AAAAAElFTkSuQmCC"}'
 principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
-dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {2}; modules_hidden=opt vec {0} })"
+dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {record { 2 }; record { 0; opt \"Private\" };} })"
 
 
 echo "-------------"
@@ -59,6 +78,6 @@ dfx canister call nft1_backend mint_exec "(record {program=$program_melt})"
 contents='record {"Preview"; "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEX/+b0At+9wrnH+AAAAGklEQVQI12NAA4z//zdgEA+AElQlcFiEBQAAQvEi6s0oFU0AAAAASUVORK5CYII="}'
 principal=khctv-a5cny-trukc-no4o2-lztmf-rs2c6-ayueh-ga6ln-kzidc-fcm4c-3qe
 
-dfx canister call nft1_backend mint "(record {contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {3}; modules_hidden=opt vec {0} })"
+dfx canister call nft1_backend mint "(record {melted=opt false; contents=vec {$contents}; owner=principal \"$principal\"; attrs_headers=vec {}; attrs=vec {}; modules=vec {record { 3 }; record { 0; opt \"Private\" };} })"
 
-dfx deploy nft1_backend
+"$opt_dep" && dfx deploy nft1_backend

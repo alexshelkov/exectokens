@@ -1,12 +1,11 @@
-use crate::{
-    attrs::Attr,
-    engine::{StoreState, WasmiLinker, WasmiStore},
-};
+use crate::engine::{StoreState, WasmiLinker, WasmiStore};
+use bitflags::{bitflags, parser};
 use candid::{CandidType, Decode, Encode, Principal};
 use ic_stable_structures::{
     storable::{Blob, Bound},
     Storable,
 };
+use nft1_core::attrs::{Attr, AttrVal};
 use std::fmt;
 use std::{borrow::Cow, cell::RefCell};
 use wasmi::{
@@ -109,7 +108,7 @@ const IMPORT_MODULES_ATTR_GET: &str = "smart_nft_attr_get";
 const IMPORT_MODULES_ATTR_SET: &str = "smart_nft_attr_set";
 
 const IMPORT_MELT_GET: &str = "smart_nft_melt_get";
-const IMPORT_MELT: &str = "smart_nft_melt";
+const IMPORT_MELT_SET: &str = "smart_nft_melt_set";
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum ImportName {
@@ -123,15 +122,13 @@ pub enum ImportName {
     ContentsSet,
 
     ModulesGet,
-    ModulesHiddenGet,
     ModulesSet,
-    ModulesHiddenSet,
 
     AttrGet,
     AttrSet,
 
     MeltGet,
-    Melt,
+    MeltSet,
 }
 
 impl Into<String> for ImportName {
@@ -147,15 +144,13 @@ impl Into<String> for ImportName {
             Self::ContentsSet => IMPORT_CONTENTS_SET.into(),
 
             Self::ModulesGet => IMPORT_MODULES_GET.into(),
-            Self::ModulesHiddenGet => IMPORT_MODULES_HIDDEN_GET.into(),
             Self::ModulesSet => IMPORT_MODULES_SET.into(),
-            Self::ModulesHiddenSet => IMPORT_MODULES_HIDDEN_SET.into(),
 
             Self::AttrGet => IMPORT_MODULES_ATTR_GET.into(),
             Self::AttrSet => IMPORT_MODULES_ATTR_SET.into(),
 
             Self::MeltGet => IMPORT_MELT_GET.into(),
-            Self::Melt => IMPORT_MELT.into(),
+            Self::MeltSet => IMPORT_MELT_SET.into(),
         };
 
         import_name.replace("_", "")
@@ -215,6 +210,87 @@ impl ModuleId {
         }
 
         ids_buf
+    }
+}
+
+impl Into<ModuleDesc> for (ModuleId, ModuleTag) {
+    fn into(self) -> ModuleDesc {
+        ModuleDesc {
+            id: self.0,
+            tag: if self.1.is_empty() {
+                ModuleTag::Public
+            } else {
+                self.1
+            },
+        }
+    }
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Copy, Debug)]
+pub struct ModuleTag(u16);
+
+bitflags! {
+    impl ModuleTag: u16 {
+        const Public =  0b00000001;
+        const Private = 0b00000010;
+    }
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct ModuleDescCreate(pub u32, pub Option<String>);
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Copy, Debug)]
+pub struct ModuleDesc {
+    pub id: ModuleId,
+    pub tag: ModuleTag,
+}
+
+impl ModuleDesc {
+    pub fn create_many(decs_create: Vec<ModuleDescCreate>) -> Option<Vec<Self>> {
+        let mut decs = vec![];
+
+        for desc_create in decs_create {
+            let tag: ModuleTag = if let Some(tag_str) = desc_create.1 {
+                parser::from_str(&tag_str).ok()?
+            } else {
+                ModuleTag::Public
+            };
+
+            decs.push(Self {
+                id: ModuleId(desc_create.0),
+                tag,
+            });
+        }
+
+        Some(decs)
+    }
+}
+
+#[cfg(test)]
+mod module_desc {
+    use super::*;
+
+    #[test]
+    fn create_many() {
+        let d1 = ModuleDesc::create_many(vec![ModuleDescCreate(1, Some("error".into()))]);
+        assert!(d1.is_none());
+
+        let d2 = ModuleDesc::create_many(vec![ModuleDescCreate(1, None)]).unwrap();
+        assert_eq!(d2[0].id, ModuleId(1));
+        let d2: Vec<_> = d2[0].tag.iter_names().collect();
+        assert_eq!(d2[0].0, "Public");
+
+
+        let d3 = ModuleDesc::create_many(vec![ModuleDescCreate(2, Some("Private".into()))]).unwrap();
+        assert_eq!(d3[0].id, ModuleId(2));
+        let d3: Vec<_> = d3[0].tag.iter_names().collect();
+        assert_eq!(d3[0].0, "Private");
+    }
+}
+
+impl Into<ModuleId> for ModuleDesc {
+    fn into(self) -> ModuleId {
+        self.id
     }
 }
 
@@ -315,61 +391,12 @@ macro_rules! define_import_get_primitive_val {
 
 define_import_get_primitive_val!(define_import_get_i32_val, i32);
 
-// pub fn define_import_get_primitive_val(
-//     name: ImportName,
-//     imports: &[Import],
-//     store: &mut WasmiStore,
-//     linker: &mut WasmiLinker,
-//     f: impl Fn() -> i32 + std::marker::Sync + Send + 'static,
-// ) {
-//     let import_fn_full_name = get_full_import_name(name, imports);
-
-//     if import_fn_full_name.is_none() {
-//         return;
-//     }
-
-//     let import_fn = WasmiFunc::wrap(
-//         &mut *store,
-//         move |caller: WasmiCaller<'_, StoreState>| {
-//             f() as i32
-//         },
-//     );
-
-//     let import_fn_full_name = import_fn_full_name.unwrap();
-
-//     linker
-//         .define("wbg", &import_fn_full_name, import_fn)
-//         .expect(&format!(
-//             "define_import_get_primitive_val can't export {}",
-//             import_fn_full_name
-//         ));
-// }
-
-// pub fn define_import_get_primitive_val<T>(
-//     name: String,
-//     store: &mut WasmiStore,
-//     linker: &mut WasmiLinker,
-//     f: impl Fn() -> T + Sync + Send + 'static,
-// ) where
-//     T: ValType + Copy + Sync + Send + 'static, // Ensure T can be converted to `Value`
-// {
-//     let import_fn = WasmiFunc::wrap(&mut *store, move |caller: WasmiCaller<'_, StoreState>| {
-//         let result: T = f();
-//         result.into() // Convert the result into `Value`
-//     });
-
-//     linker.define("wbg", &name, import_fn).expect(&format!(
-//         "define_import_get_primitive_val can't export {}",
-//         name
-//     ));
-// }
-
 pub fn define_import_set_primitive_val(
     name: ImportName,
     imports: &[Import],
     store: &mut WasmiStore,
     linker: &mut WasmiLinker,
-    f: impl Fn(i32) -> bool + std::marker::Sync + Send + 'static,
+    f: impl Fn() -> bool + std::marker::Sync + Send + 'static,
 ) {
     let import_fn_full_name = get_full_import_name(name, imports);
 
@@ -377,10 +404,9 @@ pub fn define_import_set_primitive_val(
         return;
     }
 
-    let import_fn = WasmiFunc::wrap(
-        &mut *store,
-        move |caller: WasmiCaller<'_, StoreState>, val: i32| f(val) as i32,
-    );
+    let import_fn = WasmiFunc::wrap(&mut *store, move |caller: WasmiCaller<'_, StoreState>| {
+        f() as i32
+    });
 
     let import_fn_full_name = import_fn_full_name.unwrap();
 
@@ -444,12 +470,12 @@ pub fn define_import_set_buf_val(
         ));
 }
 
-pub fn define_import_set_buf_val_by_u8_key(
+pub fn define_import_set_buf_val_by_u16_key(
     name: ImportName,
     imports: &[Import],
     store: &mut WasmiStore,
     linker: &mut WasmiLinker,
-    f: impl Fn(u8, Vec<u8>) -> bool + std::marker::Sync + Send + 'static,
+    f: impl Fn(u16, Vec<u8>) -> bool + std::marker::Sync + Send + 'static,
 ) {
     let import_fn_full_name = get_full_import_name(name, imports);
 
@@ -555,12 +581,12 @@ pub fn define_import_fn_get_buf_val(
         ));
 }
 
-pub fn define_import_fn_get_buf_val_by_u8_key(
+pub fn define_import_fn_get_buf_val_by_u16_key(
     name: ImportName,
     imports: &[Import],
     store: &mut WasmiStore,
     linker: &mut WasmiLinker,
-    f: impl Fn(u8) -> Vec<u8> + std::marker::Sync + Send + 'static,
+    f: impl Fn(u16) -> Vec<u8> + std::marker::Sync + Send + 'static,
 ) {
     let import_fn_full_name = get_full_import_name(name, imports);
 

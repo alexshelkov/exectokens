@@ -2,7 +2,6 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
-export interface AcquireArgs { 'id' : bigint }
 export interface Attr { 'val' : AttrVal, 'name' : string }
 export type AttrVal = { 'Num' : number } |
   { 'Bool' : boolean } |
@@ -11,7 +10,7 @@ export type AttrVal = { 'Num' : number } |
   { 'Time' : SystemTime } |
   { 'DateTime' : string } |
   { 'Principal' : Principal };
-export interface CollectionState {
+export interface Collection {
   'logo' : [] | [[ContentHeader, Uint8Array | number[]]],
   'name' : string,
   'author' : string,
@@ -29,9 +28,9 @@ export type ContentRole = { 'Preview' : null } |
 export interface ExecArgs { 'id' : bigint, 'command' : Uint8Array | number[] }
 export type Export = { 'Main' : null } |
   { 'User' : string } |
-  { 'View' : ViewEngine } |
-  { 'Acquire' : {} };
+  { 'View' : ViewEngine };
 export interface GetArgs { 'id' : bigint, 'owner' : Principal }
+export interface GetExecArgs { 'id' : bigint }
 export type Import = {
     'ImportFn' : {
       'name' : string,
@@ -49,16 +48,16 @@ export interface InitArgs {
 }
 export interface ListArgs { 'owner' : Principal }
 export interface MintArgs {
+  'melted' : [] | [boolean],
   'attrs' : Array<Attr>,
   'contents' : Array<[string, string]>,
   'owner' : Principal,
   'executions' : [] | [bigint],
   'modules_hidden' : [] | [Uint32Array | number[]],
-  'acquired' : [] | [boolean],
   'refills' : [] | [bigint],
   'modules' : Uint32Array | number[],
 }
-export type MintError = { 'NftDataCreateError' : null };
+export type MintError = { 'NftCreateError' : null };
 export interface MintExecArgs { 'program' : string }
 export interface Module {
   'id' : number,
@@ -68,11 +67,11 @@ export interface Module {
 }
 export interface Nft {
   'id' : bigint,
+  'melted' : boolean,
   'memory' : Array<[number, Uint8Array | number[]]>,
   'attrs' : Array<Attr>,
   'contents' : Uint8Array | number[],
   'executions' : [] | [bigint],
-  'acquires' : [] | [bigint],
   'contents_headers' : Array<ContentHeader>,
   'contents_byte_size' : bigint,
   'refills' : [] | [bigint],
@@ -88,12 +87,11 @@ export type ViewEngine = { 'Empty' : null } |
   { 'Command' : null } |
   { 'Canvas' : null };
 export interface _SERVICE {
-  'acquire' : ActorMethod<[AcquireArgs], [] | [null]>,
-  'collection_attrs' : ActorMethod<[], CollectionState>,
+  'collection_attrs' : ActorMethod<[], Collection>,
   'exec' : ActorMethod<[ExecArgs], [] | [Uint8Array | number[]]>,
-  'get_exec' : ActorMethod<[AcquireArgs], undefined>,
+  'get_exec' : ActorMethod<[GetExecArgs], undefined>,
   'get_exec_public' : ActorMethod<
-    [AcquireArgs],
+    [GetExecArgs],
     [] | [Array<[Module, Uint8Array | number[]]>]
   >,
   'get_public' : ActorMethod<[GetArgs], [] | [Nft]>,

@@ -138,7 +138,7 @@ export const MenutItemMobile = ({
   );
 };
 
-export function Dashboard() {
+export function Layout() {
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
       <aside className="inset-y fixed  left-0 z-20 flex h-full flex-col border-r">

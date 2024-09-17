@@ -10,45 +10,15 @@ import {
   SmartNftModuleImports,
   SmartNftModuleInstance
 } from '@/wasm/lib';
-
-export interface SmartCollection {
-  symbol: string;
-  name: string;
-  logo: string;
-  author: string;
-}
-
-export interface SmartNft {
-  id: bigint;
-  preview: Blob;
-}
-
-export interface SmartNftViewCanvas {
-  height: number;
-  width: number;
-  memory: WebAssembly.Memory;
-  ptr: number;
-  tick: number;
-  scale: number;
-  view: (delta: number) => boolean;
-}
-
-export interface SmartNftViewCommand {
-  run: (command: string) => Promise<string | undefined>;
-}
-
-export const smartNftViewNames = ['Canvas', 'Command'] as const;
-export type SmartNftViewName = (typeof smartNftViewNames)[number];
-
-export interface SmartNftViews {
-  viewName?: SmartNftViewName;
-  viewCanvas?: SmartNftViewCanvas;
-  viewCommand?: SmartNftViewCommand;
-}
-
-export interface SmartNftModule extends Nft1Module, SmartNftViews {
-  size: number;
-}
+import {
+  SmartCollection,
+  SmartNft,
+  SmartNftModule,
+  SmartNftViewCanvas,
+  SmartNftViewCommand,
+  SmartNftViewName,
+  SmartNftViews
+} from '@/nft/core';
 
 export const nftIdToStr = (nftId: Nft1['id']) => {
   return `${nftId}`;
@@ -198,6 +168,7 @@ const SmartView = (
 
       nftData = {
         id: data.id,
+        attrs: data.attrs,
         preview
       };
 
@@ -220,7 +191,7 @@ const SmartView = (
       }
 
       if (!nftData) {
-        throw new Error('Unreachble');
+        throw new Error('Unreachable');
       }
 
       const [data] = await nft1Actor.get_exec_public({ id });
@@ -245,7 +216,7 @@ const SmartView = (
   };
 };
 
-const SmartPreview = (
+const SmartList = (
   store: SmartStore,
   { nft1Actor }: { nft1Actor: Nft1Actor },
   owner: Principal,
@@ -253,16 +224,16 @@ const SmartPreview = (
 ) => {
   let nftsData: SmartNft[] | undefined;
 
-  const collection = async () => {
-    const datas = await nft1Actor.collection_attrs();
+  const collection = async (): Promise<SmartCollection> => {
+    const data = await nft1Actor.collection_attrs();
 
     return {
       id: collectionId,
-      symbol: datas.symbol,
-      name: datas.name,
-      logo: datas.logo,
-      author: datas.author
-    };
+      symbol: data.symbol,
+      name: data.name,
+      logo: data.logo,
+      author: data.author
+    } as SmartCollection;
   };
 
   const nfts = async () => {
@@ -270,18 +241,17 @@ const SmartPreview = (
       return nftsData;
     }
 
-    const datas = (await nft1Actor.list_public({ owner })) ?? [];
+    const data = (await nft1Actor.list_public({ owner })) ?? [];
 
     nftsData = await Promise.all(
-      datas.map(async (data) => {
-        const preview = await store.getOr(
-          nftIdToStr(data.id),
-          'preview',
-          () => getPreviewBlob(data)
+      data.map(async (data) => {
+        const preview = await store.getOr(nftIdToStr(data.id), 'preview', () =>
+          getPreviewBlob(data)
         );
 
         return {
           id: data.id,
+          attrs: data.attrs,
           preview
         };
       })
@@ -312,9 +282,9 @@ export const InitSmartView = (
     );
 
     const canisterId = Actor.canisterIdOf(nft1Actor).toText();
-    const store = await SmartStore.store(canisterId);
+    const store = await SmartStore.create(canisterId);
 
-    return SmartPreview(store, { nft1Actor }, owner, canisterId);
+    return SmartList(store, { nft1Actor }, owner, canisterId);
   };
 };
 

@@ -1,25 +1,22 @@
-use crate::attrs::{Attr, AttrVal};
-use crate::contents::{ContentHeader, HeaderBase};
-use crate::contents::{Contents, ContentsCreate};
 use crate::engine::{with_wasmi, WasmiLinker, WasmiStore};
 use crate::memory::{Memory, MEM_IDS};
 use crate::nft::{
     Collection, NftCreate, NftData, NftExecs, NftId, NftMemory, NftOwnedId, NftOwners, OwnerNfts,
 };
 use crate::program::{
-    define_import_fn_get_buf_val, define_import_fn_get_buf_val_by_str_key,
-    define_import_fn_get_buf_val_by_u8_key, define_import_fn_set_buf_val_by_str_key,
-    define_import_get_i32_val, define_import_set_buf_val, define_import_set_buf_val_by_u8_key,
-    define_import_set_primitive_val, DataModule, Export, Import, ImportName, Module, ModuleId,
+    define_import_fn_get_buf_val, define_import_fn_get_buf_val_by_str_key, define_import_fn_get_buf_val_by_u16_key, define_import_fn_set_buf_val_by_str_key, define_import_get_i32_val, define_import_set_buf_val, define_import_set_buf_val_by_u16_key, define_import_set_primitive_val, DataModule, Export, Import, ImportName, Module, ModuleDesc, ModuleId, ModuleTag
 };
 use anyhow::{anyhow, Result};
 use candid::types::result;
 use candid::{CandidType, Decode, Encode, Principal};
-use ciborium;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::vec;
 use ic_stable_structures::{
     DefaultMemoryImpl, StableBTreeMap, StableCell, StableLog, StableMinHeap, StableVec,
+};
+use nft1_core::{
+    attrs::{Attr, AttrVal},
+    contents::{ContentHeader, Contents, ContentsCreate, HeaderBase},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -161,12 +158,6 @@ pub fn nft_melt_get(id: NftId) -> Option<bool> {
     nft_data_get(id).map(|nft_data| nft_data.melted)
 }
 
-pub fn nft_modules_get(id: NftId) -> Option<(Vec<ModuleId>, Vec<ModuleId>)> {
-    let nft_data = nft_data_get(id);
-
-    nft_data.map(|nft_data| (nft_data.modules, nft_data.modules_hidden))
-}
-
 pub fn nft_memory_get(id: NftOwnedId) -> Option<NftMemory> {
     NFTS_MEMORY.with(|nfts_memory| nfts_memory.borrow().get(&id))
 }
@@ -189,7 +180,9 @@ pub fn nft_memory_get_by_key(id: NftOwnedId, key: u8) -> Vec<u8> {
 
 pub fn nft_memory_set(id: NftOwnedId, key: u8, data: Vec<u8>) -> bool {
     let res = NFTS_MEMORY.with(|nfts_memory| {
-        let memory = nfts_memory.borrow().get(&id);
+        let mut nfts_memory = nfts_memory.borrow_mut();
+
+        let memory = nfts_memory.get(&id);
 
         if memory.is_none() {
             return false;
@@ -199,7 +192,7 @@ pub fn nft_memory_set(id: NftOwnedId, key: u8, data: Vec<u8>) -> bool {
 
         memory.0.insert(key, data);
 
-        nfts_memory.borrow_mut().insert(id, memory);
+        nfts_memory.insert(id, memory);
 
         return true;
     });
@@ -308,28 +301,32 @@ pub fn nft_melt_set(id: NftId) -> bool {
     res
 }
 
-pub fn nft_modules_set(id: NftId, modules_ids: Vec<ModuleId>, hidden: bool) -> bool {
-    NFTS_DATA.with(|nfts_data| {
-        let nft_data = nfts_data.borrow().get(&id);
+pub fn nft_modules_get(id: NftId, tag: ModuleTag) -> Option<Vec<ModuleId>> {
+    let nft_data = nft_data_get(id);
 
-        if nft_data.is_none() {
+    nft_data.map(|nft_data| nft_data.get_modules(tag))
+}
+
+pub fn nft_modules_set(id: NftId, modules_ids: Vec<ModuleId>, tag: ModuleTag) -> bool {
+    NFTS_DATA.with(|nfts_data| {
+        let mut nft_data = nfts_data.borrow_mut();
+
+        let nft = nft_data.get(&id);
+
+        if nft.is_none() {
             return false;
         }
 
-        let mut nft_data = nft_data.unwrap();
+        let mut nft = nft.unwrap();
 
         // can't change modules of melted nft
-        if nft_data.melted {
+        if nft.melted {
             return false;
         }
 
-        if hidden {
-            nft_data.modules_hidden = modules_ids;
-        } else {
-            nft_data.modules = modules_ids;
-        }
+        nft.update_modules(modules_ids, tag);
 
-        nfts_data.borrow_mut().insert(id, nft_data);
+        nft_data.insert(id, nft);
 
         return true;
     })
@@ -347,33 +344,40 @@ pub fn nft_attr_get(id: NftId, key: String) -> Option<AttrVal> {
 
 pub fn nft_attr_set(id: NftId, key: String, val: AttrVal) -> bool {
     let res = NFTS_DATA.with(|nfts_data| {
-        let nft_data = nfts_data.borrow().get(&id);
+        let mut nfts_data = nfts_data.borrow_mut();
 
-        if nft_data.is_none() {
+        let nft = nfts_data.get(&id);
+
+        if nft.is_none() {
             return false;
         }
 
-        let mut nft_data = nft_data.unwrap();
+        let mut nft = nft.unwrap();
 
-        // can't change attr of melted nft
-        if nft_data.melted {
+        // can't change attrs of melted nft
+        if nft.melted {
             return false;
         }
 
-        if let Some(index) = nft_data.attrs.iter().position(|attr| attr.name == key) {
-            println!("Found '{}' at index: {}", key, index);
-
-            nft_data.attrs[index] = Attr {
+        if let Some(index) = nft.attrs.iter().position(|attr| attr.name == key) {
+            nft.attrs[index] = Attr {
                 name: key.clone(),
                 val,
             };
 
-            nfts_data.borrow_mut().insert(id, nft_data);
+            nfts_data.insert(id, nft);
 
-            return true;
+            true
+        } else {
+            nft.attrs = vec![Attr {
+                name: key.clone(),
+                val,
+            }];
+
+            nfts_data.insert(id, nft);
+
+            true
         }
-
-        return false;
     });
 
     // TODO: dbg
@@ -420,6 +424,7 @@ pub fn list_nfts(owner: Principal) -> Vec<(NftData, NftExecs, NftMemory)> {
 
 pub fn create_nft(args: NftCreate) -> Option<NftId> {
     let (contents_headers, contents) = Contents::create_many(args.contents)?;
+    let modules = ModuleDesc::create_many(args.modules)?;
 
     let id: u128 = nft_inc_id();
     let id: NftId = id.into();
@@ -430,10 +435,9 @@ pub fn create_nft(args: NftCreate) -> Option<NftId> {
         id,
         melted: args.melted,
         attrs: args.attrs,
-        contents_headers: contents_headers,
-        contents: contents,
-        modules: args.modules,
-        modules_hidden: args.modules_hidden.unwrap_or(vec![]),
+        contents_headers,
+        contents,
+        modules: modules,
     };
 
     NFTS_DATA.with(|nfts_data| {
@@ -540,11 +544,11 @@ fn define_nft_modules(
     );
 
     define_import_set_primitive_val(
-        ImportName::Melt,
+        ImportName::MeltSet,
         &imports,
         &mut *store,
         &mut *linker,
-        move |_| nft_melt_set(nft_id),
+        move || nft_melt_set(nft_id),
     );
 
     // Memory
@@ -557,51 +561,65 @@ fn define_nft_modules(
         move || nft_memory_keys(NftOwnedId(nft_id, owner)),
     );
 
-    define_import_fn_get_buf_val_by_u8_key(
+    define_import_fn_get_buf_val_by_u16_key(
         ImportName::MemoryGet,
         &imports,
         &mut *store,
         &mut *linker,
-        move |key| nft_memory_get_by_key(NftOwnedId(nft_id, owner), key),
+        move |key| nft_memory_get_by_key(NftOwnedId(nft_id, owner), key as u8),
     );
 
-    define_import_set_buf_val_by_u8_key(
+    define_import_set_buf_val_by_u16_key(
         ImportName::MemorySet,
         &imports,
         &mut *store,
         &mut *linker,
-        move |key, data| nft_memory_set(NftOwnedId(nft_id, owner), key, data),
+        move |key, data| nft_memory_set(NftOwnedId(nft_id, owner), key as u8, data),
     );
 
     // Modules
 
-    for name in [ImportName::ModulesGet, ImportName::ModulesHiddenGet] {
-        define_import_fn_get_buf_val(name, &imports, &mut *store, &mut *linker, move || {
-            let ids = nft_modules_get(nft_id);
+    // for name in [ImportName::ModulesGet, ImportName::ModulesHiddenGet] {
+    define_import_fn_get_buf_val_by_u16_key(
+        ImportName::ModulesGet,
+        &imports,
+        &mut *store,
+        &mut *linker,
+        move |tag| {
+            let tag = ModuleTag::from_bits(tag);
 
-            ids.map(|ids| {
-                ModuleId::ids_to_buf(if name == ImportName::ModulesGet {
-                    ids.0
-                } else {
-                    ids.1
-                })
-            })
-            .unwrap_or(vec![])
-        });
-    }
+            if tag.is_none() {
+                return vec![];
+            }
 
-    for name in [ImportName::ModulesSet, ImportName::ModulesHiddenSet] {
-        define_import_set_buf_val(name, &imports, &mut *store, &mut *linker, move |data| {
+            let ids = nft_modules_get(nft_id, tag.unwrap());
+
+            ids.map(|ids| ModuleId::ids_to_buf(ids)).unwrap_or(vec![])
+        },
+    );
+
+    define_import_set_buf_val_by_u16_key(
+        ImportName::ModulesSet,
+        &imports,
+        &mut *store,
+        &mut *linker,
+        move |tag, data| {
+            let tag = ModuleTag::from_bits(tag);
+
+            if tag.is_none() {
+                return false;
+            }
+
             let ids = ModuleId::ids_from_buf(data);
 
-            ids.map(|ids| nft_modules_set(nft_id, ids, name == ImportName::ModulesSet))
+            ids.map(|ids| nft_modules_set(nft_id, ids, tag.unwrap()))
                 .unwrap_or(false)
-        });
-    }
+        },
+    );
 
     // Contents
 
-    for name in [ImportName::ContentsGet, ImportName::ContentsHeadersSet] {
+    for name in [ImportName::ContentsGet, ImportName::ContentsHeadersGet] {
         define_import_fn_get_buf_val(name, &imports, &mut *store, &mut *linker, move || {
             let contents = nft_contents_get(nft_id);
 
@@ -815,18 +833,6 @@ pub fn get_module_by_export_ids(export: Export, ids: Vec<ModuleId>) -> Option<Mo
     MODULES.with(|modules| {
         for (name, module) in modules.borrow().iter() {
             if ids.contains(&module.id) && module.exports.contains(&export) {
-                return Some(module);
-            }
-        }
-
-        None
-    })
-}
-
-pub fn get_module_by_export(export: Export) -> Option<Module> {
-    MODULES.with(|modules| {
-        for (name, module) in modules.borrow().iter() {
-            if module.exports.contains(&export) {
                 return Some(module);
             }
         }
