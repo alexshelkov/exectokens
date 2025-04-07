@@ -2,15 +2,17 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
-export interface Attr { 'val' : AttrVal, 'name' : string }
+export interface Attr { 'id' : number, 'val' : AttrVal, 'name' : string }
 export type AttrVal = { 'Num' : number } |
   { 'Bool' : boolean } |
   { 'Date' : string } |
+  { 'RGBA' : [number, number, number, number] } |
   { 'Text' : string } |
-  { 'Time' : SystemTime } |
+  { 'Time' : string } |
   { 'DateTime' : string } |
-  { 'Principal' : Principal };
+  { 'Principal' : string };
 export interface Collection {
+  'supply_cap' : [[] | [bigint], [] | [number]],
   'logo' : [] | [[ContentHeader, Uint8Array | number[]]],
   'name' : string,
   'author' : string,
@@ -40,25 +42,28 @@ export type Import = {
   } |
   { 'Import' : string };
 export interface InitArgs {
+  'supply_cap' : [] | [[[] | [bigint], [] | [number]]],
   'logo' : string,
   'name' : string,
   'author' : string,
   'symbol' : string,
-  'program' : string,
 }
 export interface ListArgs { 'owner' : Principal }
-export interface MintArgs {
+export type MintError = { 'NftSupplyCapReached' : null } |
+  { 'InvalidPrincipal' : null } |
+  { 'NftCreateError' : null };
+export interface MintExecParams { 'program' : ProgramCreate }
+export type MintExecResult = { 'Ok' : number };
+export interface MintParams {
   'melted' : [] | [boolean],
   'attrs' : Array<Attr>,
   'contents' : Array<[string, string]>,
-  'owner' : Principal,
+  'owner' : string,
   'executions' : [] | [bigint],
-  'modules_hidden' : [] | [Uint32Array | number[]],
-  'refills' : [] | [bigint],
-  'modules' : Uint32Array | number[],
+  'modules' : Array<[number, [] | [string]]>,
 }
-export type MintError = { 'NftCreateError' : null };
-export interface MintExecArgs { 'program' : string }
+export type MintResult = { 'Ok' : bigint } |
+  { 'Err' : MintError };
 export interface Module {
   'id' : number,
   'exports' : Array<Export>,
@@ -68,27 +73,29 @@ export interface Module {
 export interface Nft {
   'id' : bigint,
   'melted' : boolean,
-  'memory' : Array<[number, Uint8Array | number[]]>,
+  'memory' : Array<[number, [number, Uint8Array | number[]]]>,
   'attrs' : Array<Attr>,
   'contents' : Uint8Array | number[],
   'executions' : [] | [bigint],
   'contents_headers' : Array<ContentHeader>,
   'contents_byte_size' : bigint,
-  'refills' : [] | [bigint],
   'modules' : Uint32Array | number[],
 }
-export type Result = { 'Ok' : bigint } |
-  { 'Err' : MintError };
-export interface SystemTime {
-  'nanos_since_epoch' : number,
-  'secs_since_epoch' : bigint,
-}
+export type NftExecErr = { 'ModuleNotFound' : null } |
+  { 'NftDataNotFound' : null };
+export type NftUpdate = { 'Attr' : Attr } |
+  { 'Melt' : boolean } |
+  { 'Memory' : [number, [] | [Uint8Array | number[]]] };
+export type ProgramCreate = { 'Wat' : [string, string] } |
+  { 'Binary' : [string, Uint8Array | number[]] };
+export type Result = { 'Ok' : [Uint8Array | number[], Array<NftUpdate>] } |
+  { 'Err' : NftExecErr };
 export type ViewEngine = { 'Empty' : null } |
   { 'Command' : null } |
   { 'Canvas' : null };
 export interface _SERVICE {
   'collection_attrs' : ActorMethod<[], Collection>,
-  'exec' : ActorMethod<[ExecArgs], [] | [Uint8Array | number[]]>,
+  'exec' : ActorMethod<[ExecArgs], Result>,
   'get_exec' : ActorMethod<[GetExecArgs], undefined>,
   'get_exec_public' : ActorMethod<
     [GetExecArgs],
@@ -98,9 +105,8 @@ export interface _SERVICE {
   'last_id' : ActorMethod<[], bigint>,
   'list' : ActorMethod<[ListArgs], undefined>,
   'list_public' : ActorMethod<[ListArgs], Array<Nft>>,
-  'mint' : ActorMethod<[MintArgs], Result>,
-  'mint_exec' : ActorMethod<[MintExecArgs], number>,
-  'mint_stream' : ActorMethod<[{}], undefined>,
+  'mint' : ActorMethod<[MintParams], MintResult>,
+  'mint_exec' : ActorMethod<[MintExecParams], MintExecResult>,
   'ver' : ActorMethod<[], number>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

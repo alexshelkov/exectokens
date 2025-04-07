@@ -1,7 +1,7 @@
 import { NftDetailsCard } from '@/components/blocks/NftDetailsCard';
 import { SmartCollection, SmartNft, SmartNftModule } from '@/nft/core';
-import { useNavigate } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { CanvasView } from '@/components/feature/view/Canvas';
+import { CommandView } from './view/Command';
 
 export interface NftDetailsProps {
   nft: SmartNft;
@@ -9,23 +9,11 @@ export interface NftDetailsProps {
   modules: SmartNftModule[];
 }
 
-export interface Command {
-  origin: 'user' | 'system';
-  content: string;
-}
-
 export default function NftDetails({
   collectionAttrs,
   nft,
   modules
 }: NftDetailsProps) {
-  const navigate = useNavigate({ from: '/$canisterId/$nftId' });
-  const viewCommand =
-    useRef<(command: string) => Promise<string | undefined>>();
-  const init = useRef(false);
-  const display = useRef<HTMLCanvasElement>(null);
-  const [commandsHistory, setCommandHistory] = useState<Command[]>([]);
-
   const cardModules = modules.map((module) => {
     return {
       name: module.name,
@@ -51,101 +39,25 @@ export default function NftDetails({
     };
   });
 
-  const mod = modules.find((module) => module.viewName);
-  const viewName = mod?.viewName;
+  const views = modules
+    .flatMap((module) =>
+      module.views.map((view) => {
+        const key = `${module.name}/${view.name}`;
 
-  useEffect(() => {
-    if (!(!init.current && mod && viewName)) {
-      return;
-    }
+        if (view.name === 'Canvas') {
+          return <CanvasView key={key} view={view} />;
+        } else if (view.name === 'Command') {
+          return <CommandView key={key} view={view} />;
+        }
 
-    init.current = true;
-
-    if (mod.viewCanvas && display.current) {
-      const { viewCanvas } = mod;
-
-      const { height, width, memory, ptr, view, tick, scale } = viewCanvas;
-
-      display.current.height = height;
-      display.current.width = width;
-
-      const image = new ImageData(
-        new Uint8ClampedArray(memory.buffer, ptr, 4 * width * height),
-        width,
-        height
-      );
-
-      display.current.style.width = `${width * scale}px`;
-      display.current.style.height = `${height * scale}px`;
-
-      const ctx = display.current.getContext('2d');
-
-      if (tick) {
-        let lastFrame = Date.now();
-
-        const draw = () => {
-          const delta = Date.now() - lastFrame;
-
-          if (delta >= tick) {
-            if (view(delta)) {
-              ctx?.putImageData(image, 0, 0);
-            }
-            lastFrame = Date.now();
-          }
-          requestAnimationFrame(() => draw());
-        };
-
-        draw();
-      }
-
-      view(0);
-
-      ctx?.putImageData(image, 0, 0);
-    } else if (mod.viewCommand) {
-      if (!viewCommand.current) {
-        viewCommand.current = mod.viewCommand.run;
-      }
-    }
-  }, [mod, viewName]);
-
-  const handleBack = () => {
-    navigate({
-      to: '/$canisterId',
-      params: { canisterId: collectionAttrs.id }
-    });
-  };
-
-  const handleRun = async (command: string) => {
-    if (!viewCommand.current) {
-      return;
-    }
-
-    const commands = commandsHistory.concat([
-      {
-        origin: 'user',
-        content: command
-      }
-    ]);
-
-    setCommandHistory(commands);
-
-    const response = await viewCommand.current(command);
-
-    if (response) {
-      setCommandHistory(
-        commands.concat([
-          {
-            origin: 'system',
-            content: response
-          }
-        ])
-      );
-    }
-  };
+        return null;
+      })
+    )
+    .filter((view) => !!view);
 
   return (
     <NftDetailsCard
-      ref={display}
+      canisterId={collectionAttrs.id}
       name={collectionAttrs.name}
       symbol={collectionAttrs.symbol}
       id={nft.id}
@@ -153,10 +65,8 @@ export default function NftDetails({
       alt=""
       attrs={cardAttrs}
       modules={cardModules}
-      viewName={viewName}
-      commandsHistory={commandsHistory}
-      onBack={handleBack}
-      onRun={handleRun}
-    />
+    >
+      {views}
+    </NftDetailsCard>
   );
 }

@@ -1,0 +1,3 @@
+cargo build --profile release-module --target=wasm32-unknown-unknown
+wasm-opt -O ../../../../target/wasm32-unknown-unknown/release-module/program_basic_view_command.wasm -o ../../../../target/wasm32-unknown-unknown/release-module/program_basic_view_command.wasm
+wasm2wat ../../../../target/wasm32-unknown-unknown/release-module/program_basic_view_command.wasm > ../../../../scripts/programs/program_basic_view_command.wat

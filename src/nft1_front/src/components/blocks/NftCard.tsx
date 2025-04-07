@@ -1,8 +1,5 @@
-import { Heart } from 'lucide-react';
-
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import BlobImage from '@/components/blocks/BlobImage';
 
@@ -27,13 +24,6 @@ export default function NftCard({
         <AspectRatio ratio={1 / 1}>
           <BlobImage image={image} alt={alt} />
         </AspectRatio>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="absolute top-2 right-2 text-white hover:text-white hover:bg-white/20"
-        >
-          <Heart className="h-5 w-5" />
-        </Button>
       </CardContent>
       <CardFooter className="flex justify-between items-center p-4">
         <div>

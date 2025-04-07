@@ -6,7 +6,7 @@ import { rootRoute } from '@/routes/RootRoute';
 
 export interface NftsLoader {
   collection: SmartCollection;
-  nfts: SmartNft[]
+  nfts: SmartNft[];
 }
 
 export const nftsListRoute = createRoute({
@@ -20,11 +20,11 @@ export const nftsListRoute = createRoute({
 
     const nfts = await View.nfts();
 
-    return { collection, nfts };
+    return { collection, nfts, route: 'nftsListRoute' };
   }
 });
 
-export default function NftsListRoute() {
+function NftsListRoute() {
   const { collection, nfts } = nftsListRoute.useLoaderData();
 
   return <NftsList collection={collection} nfts={nfts} />;

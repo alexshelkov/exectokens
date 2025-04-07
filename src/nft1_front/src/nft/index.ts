@@ -2,152 +2,58 @@ import { Actor } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 
 import { getPreviewBlob } from '@/nft/utils';
-import { SmartStore } from '@/nft/store';
 import { CanisterActorsFactory, Identity, getCanister } from '@/nft/canister';
 import { Nft1, Nft1Actor, Nft1Module } from '@/ic/lib';
-import {
-  createSmartNftInstance,
-  SmartNftModuleImports,
-  SmartNftModuleInstance
-} from '@/wasm/lib';
 import {
   SmartCollection,
   SmartNft,
   SmartNftModule,
-  SmartNftViewCanvas,
-  SmartNftViewCommand,
-  SmartNftViewName,
-  SmartNftViews
+  SmartNftView
 } from '@/nft/core';
+import { createViewCanvas, createCommandView } from '@/nft/view';
 
 export const nftIdToStr = (nftId: Nft1['id']) => {
   return `${nftId}`;
 };
 
-const toResponse = (bytes: Uint8Array | number[]) => {
-  return new Response(bytes as Uint8Array, {
-    headers: { 'Content-Type': 'application/wasm' }
-  });
-};
-
-const isExportExists = (exports: SmartNftModule['exports'], name: string) => {
-  return exports.some((exp) => {
-    if ('User' in exp) {
-      return exp.User === name;
-    }
-
-    return false;
-  });
-};
-
-const getCanvasView = (
-  moduleInstance: SmartNftModuleInstance,
-  memory: WebAssembly.Memory,
-  exportNames: SmartNftModule['exports']
-): SmartNftViewCanvas => {
-  return {
-    height: moduleInstance.smart_nft_view_canvas_get_height(),
-    width: moduleInstance.smart_nft_view_canvas_get_width(),
-    ptr: moduleInstance.smart_nft_view_canvas_get_buffer(),
-    memory: memory,
-    view: moduleInstance.smart_nft_view_canvas,
-    tick: isExportExists(exportNames, 'smart_nft_view_canvas_get_tick')
-      ? moduleInstance.smart_nft_view_canvas_get_tick()
-      : 0,
-    scale: isExportExists(exportNames, 'smart_nft_view_canvas_get_scale')
-      ? moduleInstance.smart_nft_view_canvas_get_scale()
-      : 1
-  };
-};
-
-const getCommandView = (
-  moduleInstance: SmartNftModuleInstance,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _memory: WebAssembly.Memory,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _exportNames: SmartNftModule['exports']
-): SmartNftViewCommand => {
-  return {
-    async run(command: string) {
-      const encoder = new TextEncoder();
-
-      const result = await moduleInstance.smart_nft_view_command(
-        encoder.encode(command)
-      );
-
-      const decoder = new TextDecoder();
-
-      return decoder.decode(result);
-    }
-  };
-};
-
-export const Module = async (
-  imports: SmartNftModuleImports,
+export const SmartModule = async (
+  id: bigint,
+  nftData: SmartNft,
+  { nft1Actor }: { nft1Actor: Nft1Actor },
   nft1Module: Nft1Module,
   moduleCode: Uint8Array | number[]
 ): Promise<SmartNftModule> => {
-  const wasm = createSmartNftInstance(
-    nft1Module.exports,
-    nft1Module.imports,
-    imports
-  );
+  const processing = nft1Module.exports.map(async (exp) => {
+    if ('View' in exp) {
+      const view = [nftData, { nft1Actor }, nft1Module, moduleCode] as const;
 
-  const { memory } = await wasm.init(toResponse(moduleCode));
-
-  const views = nft1Module.exports.reduce(
-    (views, exp) => {
-      if ('View' in exp) {
-        if ('Canvas' in exp.View) {
-          views.avail.push('Canvas');
-          views.viewCanvas = getCanvasView(wasm, memory, nft1Module.exports);
-        } else if ('Command' in exp.View) {
-          views.avail.push('Command');
-          views.viewCommand = getCommandView(wasm, memory, nft1Module.exports);
-        }
+      if ('Canvas' in exp.View) {
+        return await createViewCanvas(...view);
+      } else if ('Command' in exp.View) {
+        return await createCommandView(...view);
       }
+    }
 
-      return views;
-    },
-    { avail: [] } as SmartNftViews & { avail: string[] }
+    return undefined!; // NOTE: must filter out later
+  });
+
+  const views: SmartNftView[] = (await Promise.all(processing)).filter(
+    (view) => !!view
   );
-
-  const viewHint = isExportExists(nft1Module.exports, 'smart_nft_view_name')
-    ? (wasm.smart_nft_view_name() as SmartNftViewName)
-    : undefined;
-
-  if (views.avail.includes(viewHint as SmartNftViewName)) {
-    views.viewName = viewHint;
-  } else {
-    views.viewName = views.avail.shift() as SmartNftViewName | undefined;
-  }
 
   return {
     ...nft1Module,
-    ...views,
+    views,
     size: moduleCode.length
   };
 };
 
 const SmartView = (
-  store: SmartStore,
   { nft1Actor }: { nft1Actor: Nft1Actor },
   owner: Principal,
   nftsData: SmartNft[] | undefined
 ) => {
   return (id: bigint) => {
-    const imports: SmartNftModuleImports = {
-      async smart_nft_main_run_async(command) {
-        const [result] = await nft1Actor.exec({ id, command });
-
-        if (!result) {
-          return new Uint8Array(0);
-        }
-
-        return result as Uint8Array;
-      }
-    };
-
     let nftData: SmartNft | undefined = nftsData?.find((nft) => nft.id === id);
     let modules: SmartNftModule[] | undefined;
 
@@ -162,14 +68,10 @@ const SmartView = (
         throw new Error(`NFT not found: ${id}`);
       }
 
-      const preview = await store.getOr(nftIdToStr(data.id), 'preview', () =>
-        getPreviewBlob(data)
-      );
-
       nftData = {
         id: data.id,
         attrs: data.attrs,
-        preview
+        preview: getPreviewBlob(data.contents)
       };
 
       return nftData;
@@ -201,9 +103,13 @@ const SmartView = (
       }
 
       modules = await Promise.all(
-        data.map(async ([module, moduleCode]) =>
-          Module(imports, module, moduleCode)
-        )
+        data.map(async ([module, moduleCode]) => {
+          if (!nftData) {
+            throw new Error('Unreachable');
+          }
+
+          return SmartModule(id, nftData, { nft1Actor }, module, moduleCode);
+        })
       );
 
       return modules;
@@ -217,7 +123,6 @@ const SmartView = (
 };
 
 const SmartList = (
-  store: SmartStore,
   { nft1Actor }: { nft1Actor: Nft1Actor },
   owner: Principal,
   collectionId: string
@@ -229,9 +134,9 @@ const SmartList = (
 
     return {
       id: collectionId,
-      symbol: data.symbol,
       name: data.name,
-      logo: data.logo,
+      symbol: data.symbol,
+      logo: getPreviewBlob(data.logo[0]![1]),
       author: data.author
     } as SmartCollection;
   };
@@ -245,14 +150,10 @@ const SmartList = (
 
     nftsData = await Promise.all(
       data.map(async (data) => {
-        const preview = await store.getOr(nftIdToStr(data.id), 'preview', () =>
-          getPreviewBlob(data)
-        );
-
         return {
           id: data.id,
           attrs: data.attrs,
-          preview
+          preview: getPreviewBlob(data.contents)
         };
       })
     );
@@ -260,7 +161,7 @@ const SmartList = (
     return nftsData;
   };
 
-  const view = SmartView(store, { nft1Actor }, owner, nftsData);
+  const view = SmartView({ nft1Actor }, owner, nftsData);
 
   return {
     collection,
@@ -282,9 +183,8 @@ export const InitSmartView = (
     );
 
     const canisterId = Actor.canisterIdOf(nft1Actor).toText();
-    const store = await SmartStore.create(canisterId);
 
-    return SmartList(store, { nft1Actor }, owner, canisterId);
+    return SmartList({ nft1Actor }, owner, canisterId);
   };
 };
 

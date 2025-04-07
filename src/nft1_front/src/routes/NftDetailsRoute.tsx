@@ -25,11 +25,11 @@ export const nftDetailsRoute = createRoute({
 
     const modules = await getExecPublic();
 
-    return { collectionAttrs, nft, modules };
+    return { collectionAttrs, nft, modules, route: 'nftDetailsRoute' };
   }
 });
 
-export default function NftDetailsRoute() {
+function NftDetailsRoute() {
   const { collectionAttrs, nft, modules } = nftDetailsRoute.useLoaderData();
 
   return (

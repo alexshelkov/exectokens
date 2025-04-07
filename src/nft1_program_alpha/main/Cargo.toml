@@ -1,0 +1,15 @@
+[package]
+name = "program_alpha_main"
+version = "0.1.0"
+authors = ["Alex Shelkovskiy <alexshelkov@gmail.com>"]
+edition = "2021"
+
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+
+[dependencies]
+program_alpha_protocol = { path = "../protocol" }
+nft1_core = { path = "../../nft1_core" }

@@ -1,16 +1,23 @@
 use crate::{
-    nft::{Collection, Nft, NftCreate, NftData, NftExecs, NftMemory, NftOwnedId},
-    program::{DataModule, Export, Module, ModuleDesc, ModuleDescCreate, ModuleId},
+    nft::{
+        Collection, Nft, NftCreate, NftData, NftExec, NftExecErr, NftExecs, NftMemory, NftOwnedId,
+        NftSupplyCap,
+    },
+    program::{DataModule, Export, Module, ModuleDesc, ModuleId},
     state::{
-        create_nft, exec_run, get_data_modules, get_module_code, list_nfts, nft_data_get, nft_get,
-        nft_get_id, nft_inc_id, nft_memory_get, update_collection, update_modules, with_collection,
-        COLLECTION, MODULES, MODULES_DATA, NFTS_DATA, NFT_LAST_ID,
+        create_nft, exec_run, get_data_modules, get_module_code, list_modules, list_nfts,
+        nft_data_get, nft_get, nft_get_id, nft_inc_id, nft_memory_get, parse_program,
+        update_collection, update_modules, with_collection, COLLECTION, MODULES, MODULES_DATA,
+        NFTS_DATA, NFT_LAST_ID,
     },
 };
 use candid::{CandidType, Encode, Principal};
 use nft1_core::{
     attrs::{Attr, AttrVal},
-    contents::{Contents, ContentsCreate},
+    contents::{Content, ContentsCreate},
+    mint::{MintError, MintExecParams, MintExecResult, MintParams, MintResult},
+    modules::ModuleDescCreate,
+    view::command::{CommandInput, CommandOutput},
 };
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -26,28 +33,7 @@ pub struct InitArgs {
     pub logo: String,
     pub symbol: String,
     pub author: String,
-    pub program: String,
-}
-
-#[derive(CandidType, Deserialize)]
-pub struct MintExecArgs {
-    pub program: String,
-}
-
-#[derive(CandidType, Deserialize)]
-pub struct MintArgs {
-    pub owner: Principal,
-    pub executions: Option<u64>,
-    pub refills: Option<u64>,
-    pub melted: Option<bool>,
-    pub attrs: Vec<Attr>,
-    pub contents: Vec<ContentsCreate>,
-    pub modules: Vec<ModuleDescCreate>,
-}
-
-#[derive(CandidType, Deserialize)]
-pub enum MintError {
-    NftCreateError,
+    pub supply_cap: Option<NftSupplyCap>,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -85,51 +71,17 @@ pub struct ExecArgs {
     pub command: Vec<u8>,
 }
 
-#[derive(CandidType, Clone, Serialize, Deserialize, Debug)]
-pub enum CodeRaw {
-    Wat(String),
-}
-
-#[derive(CandidType, Clone, Serialize, Deserialize, Debug)]
-pub struct ModuleRaw {
-    pub name: String,
-    pub code: CodeRaw,
-}
-
-#[derive(CandidType, Clone, Serialize, Deserialize, Debug)]
-pub struct ProgramRaw {
-    pub modules: Vec<ModuleRaw>,
-}
-
-impl ProgramRaw {
-    fn default() -> Self {
-        Self { modules: vec![] }
-    }
-    fn get_modules(&self) -> Vec<(String, Vec<u8>)> {
-        self.modules
-            .iter()
-            .map(|module| match &module.code {
-                CodeRaw::Wat(code) => {
-                    let wasm = wat::parse_str(code).expect("can't parse wasm code");
-
-                    (module.name.clone(), wasm)
-                }
-            })
-            .collect()
-    }
-}
+// INIT
+// ----------------------------------------------------------------------------------------
 
 #[init]
 fn init(args: InitArgs) {
-    let program: ProgramRaw = serde_json::from_str(&args.program).expect("failed to parse code");
-
-    update_modules(program.get_modules());
-
     update_collection(Collection {
         name: args.name,
-        logo: Contents::create_logo(args.logo),
+        logo: Content::create_logo(args.logo),
         symbol: args.symbol,
         author: args.author,
+        supply_cap: args.supply_cap.unwrap_or(NftSupplyCap::default()),
     });
 }
 
@@ -137,17 +89,20 @@ fn init(args: InitArgs) {
 // ----------------------------------------------------------------------------------------
 
 #[update(name = "mint_exec")]
-fn mint_exec(args: MintExecArgs) -> u32 {
-    let program: ProgramRaw = serde_json::from_str(&args.program).expect("failed to parse code");
-
-    update_modules(program.get_modules())
+fn mint_exec(args: MintExecParams) -> MintExecResult {
+    MintExecResult::Ok(update_modules(parse_program(args.program)))
 }
 
 #[update(name = "mint")]
-fn mint(args: MintArgs) -> Result<u128, MintError> {
+fn mint(args: MintParams) -> MintResult {
+    let owner = Principal::from_text(args.owner);
+
+    if owner.is_err() {
+        return MintResult::Err(MintError::InvalidPrincipal);
+    }
+
     let nft_data_create = NftCreate {
-        owner: args.owner,
-        refills: args.refills,
+        owner: owner.unwrap(),
         executions: args.executions,
         melted: args.melted.unwrap_or(true),
         attrs: args.attrs,
@@ -156,12 +111,9 @@ fn mint(args: MintArgs) -> Result<u128, MintError> {
     };
 
     create_nft(nft_data_create)
-        .map(|id| Ok(id.into()))
-        .unwrap_or(Err(MintError::NftCreateError))
+        .map(|id| MintResult::Ok(id.into()))
+        .unwrap_or(MintResult::Err(MintError::NftCreateError))
 }
-
-#[update(name = "mint_stream")]
-fn mint_stream(args: MintStreamArgs) {}
 
 // MEMORY
 // ----------------------------------------------------------------------------------------
@@ -194,8 +146,10 @@ fn list_public(args: ListArgs) -> Vec<Nft> {
         .collect()
 }
 
-#[update(name = "list")]
-fn list(args: ListArgs) {}
+#[query(name = "list_programs")]
+fn list_programs() -> Vec<Module> {
+    list_modules()
+}
 
 // EXEC
 // ----------------------------------------------------------------------------------------
@@ -216,10 +170,17 @@ fn get_exec_public(args: GetExecArgs) -> Option<Vec<DataModule>> {
 fn get_exec(args: GetExecArgs) {}
 
 #[update(name = "exec")]
-fn exec(args: ExecArgs) -> Option<Vec<u8>> {
+fn exec(args: ExecArgs) -> Result<NftExec, NftExecErr> {
     let owner = ic_cdk::caller();
 
     let id_owned = NftOwnedId(args.id.into(), owner);
+
+    // TODO: dbg
+    if args.command.len() > 30 {
+        ic_cdk::println!("exec len: {:?}", args.command.len());
+    } else {
+        ic_cdk::println!("exec: {:?}", args.command);
+    };
 
     exec_run(id_owned, args.command)
 }

@@ -1,0 +1,14 @@
+[package]
+name = "program_basic_main_command_exec"
+version = "0.1.0"
+authors = ["Alex Shelkovskiy <alexshelkov@gmail.com>"]
+edition = "2021"
+
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+
+[dependencies]
+program_basic_protocol = { path = "../../protocol" }

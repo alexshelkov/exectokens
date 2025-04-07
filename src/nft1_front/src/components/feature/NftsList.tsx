@@ -2,10 +2,11 @@ import { Link } from '@tanstack/react-router';
 
 import NftCard from '@/components/blocks/NftCard';
 import { SmartCollection, SmartNft } from '@/nft/core';
+import { nftLink } from '@/routes/links';
 
 export interface NftsListProps {
   collection: SmartCollection;
-  nfts: SmartNft[]
+  nfts: SmartNft[];
 }
 
 export default function NftsList({ collection, nfts }: NftsListProps) {
@@ -14,8 +15,12 @@ export default function NftsList({ collection, nfts }: NftsListProps) {
       {nfts.map((nft) => {
         return (
           <Link
+            {...nftLink}
             key={`${collection.id}/${nft.id}`}
-            to={`/${collection.id}/${nft.id}`}
+            params={{
+              canisterId: collection.id,
+              nftId: `${nft.id}`
+            }}
           >
             <NftCard
               image={nft.preview}

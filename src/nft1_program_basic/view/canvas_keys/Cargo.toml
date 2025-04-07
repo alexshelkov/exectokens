@@ -1,0 +1,12 @@
+[package]
+name = "program_basic_view_canvas_keys"
+version = "0.1.0"
+authors = ["Alex Shelkovskiy <alexshelkov@gmail.com>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+
+[dependencies]

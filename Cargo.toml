@@ -2,10 +2,20 @@
 members = [
   "src/nft1_core",
   "src/nft1_backend",
-  "src/program_basic_melt",
-  "src/program_basic_main",
-  "src/program_basic_canvas",
-  "src/program_basic_command",
+  
+  "src/nft1_program_basic/protocol",
+  "src/nft1_program_basic/main/command_exec",
+  "src/nft1_program_basic/view/canvas",
+  "src/nft1_program_basic/view/canvas_keys",
+  "src/nft1_program_basic/view/command",
+  "src/nft1_program_basic/view/command_exec",
+
+  "src/nft1_program_alpha/protocol",
+  "src/nft1_program_alpha/main",
+  "src/nft1_program_alpha/view",
+  
+  "src/nft1_program_snake/main",
+  "src/nft1_program_snake/view"
 ]
 resolver = "2"
 

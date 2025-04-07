@@ -16,6 +16,7 @@ pub struct MemoryIds {
     modules_data: MemoryId,
     modules_last_id: MemoryId,
     nft_last_id: MemoryId,
+    nft_supply: MemoryId,
     nfts_data: MemoryId,
     nfts_owners: MemoryId,
     owner_nfts: MemoryId,
@@ -42,6 +43,7 @@ impl_memory_methods! {
     modules_data,
     modules_last_id,
     nft_last_id,
+    nft_supply,
     nfts_data,
     nfts_owners,
     owner_nfts,
@@ -56,11 +58,12 @@ pub const MEM_IDS: MemoryIds = MemoryIds {
     modules_data: MemoryId::new(2),
     modules_last_id: MemoryId::new(3),
     nft_last_id: MemoryId::new(4),
-    nfts_data: MemoryId::new(5),
-    nfts_owners: MemoryId::new(6),
-    owner_nfts: MemoryId::new(7),
-    nfts_memory: MemoryId::new(8),
-    nfts_execs: MemoryId::new(9),
+    nft_supply: MemoryId::new(5),
+    nfts_data: MemoryId::new(6),
+    nfts_owners: MemoryId::new(7),
+    owner_nfts: MemoryId::new(8),
+    nfts_memory: MemoryId::new(9),
+    nfts_execs: MemoryId::new(10),
 };
 
 thread_local! {

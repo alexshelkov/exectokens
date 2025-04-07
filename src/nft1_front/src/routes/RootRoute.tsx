@@ -16,7 +16,7 @@ const ErrorComponent = ({ error }: { error: Error }) => {
             router.invalidate();
           }}
         >
-          retry
+          Retry
         </button>
       </div>
     </div>

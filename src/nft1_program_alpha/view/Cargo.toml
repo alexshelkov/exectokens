@@ -1,0 +1,16 @@
+[package]
+name = "program_alpha_view"
+version = "0.1.0"
+authors = ["Alex Shelkovskiy <alexshelkov@gmail.com>"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+
+[dependencies]
+base64 = "0.22.1"
+# base64 = { version = "", features = ["wasm"] }
+nft1_core = { path = "../../nft1_core" }
+program_alpha_protocol = { path = "../protocol" }

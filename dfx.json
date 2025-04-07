@@ -4,6 +4,11 @@
       "candid": "target/did/nft1_backend.did",
       "package": "nft1_backend",
       "type": "rust"
+    },
+    "nft2_backend": {
+      "candid": "target/did/nft1_backend.did",
+      "package": "nft1_backend",
+      "type": "rust"
     }
   },
   "defaults": {
