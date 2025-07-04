@@ -36,8 +36,8 @@ cr=$(tput setaf 1) # red
 cg=$(tput setaf 2) # green
 rr=$(tput sgr0)    # reset
 
-echo "${cr}Working with $opt_set variant..."
-echo "Working with canister: $canister_name...${rr}"
+echo "${cr}Working with $canister_name $opt_set variant...${rr}"
+echo ""
 
 # ------------------------------------------------------------------------------------------------------------------
 dfx canister uninstall-code $canister_name

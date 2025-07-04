@@ -14,6 +14,7 @@ const SmartView = InitSmartView(identity, actorsFactory, owner);
 const router = createRouter({
   routeTree,
   defaultStaleTime: Infinity,
+  defaultPreloadStaleTime: 0,
   context: { SmartView }
 });
 
