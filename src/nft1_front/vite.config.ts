@@ -38,8 +38,8 @@ export default defineConfig({
       },
 
       manifest: {
-        name: 'nft1_front',
-        short_name: 'nft1_front',
+        name: 'Plasma',
+        short_name: 'Plasma',
         description: 'Smart NFT viewer',
         theme_color: '#ffffff'
       },

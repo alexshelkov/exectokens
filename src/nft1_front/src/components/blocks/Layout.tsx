@@ -16,7 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@/components/ui/tooltip';
-import logo from '@/assets/logo.svg';
+import logo from '@/assets/logo.png';
 import { cn } from '@/lib/utils';
 import { indexLink } from '@/routes/links';
 
